@@ -18,60 +18,62 @@ You can edit, delete, or extend them — they're regular snippets stored in the 
 
 ## The 25 prompts
 
-### Programming / DevX
+Each row links you to its full source body in [`ai_prompts.json`](../core/rust-lib/src/seed/ai_prompts.json). The "What you get back" column summarises the structured output the prompt asks the LLM for — every prompt enforces sections, bullets, and a final output-format directive.
 
-| Abbreviation | Title |
-|---|---|
-| `aiplan` | Software architecture / implementation plan |
-| `aireview` | Senior code review (security + performance + maintainability) |
-| `airefactor` | Refactor for clarity (behavior-preserving) |
-| `airegex` | Regex generation + explanation |
-| `aisql` | SQL query from natural language |
-| `aitest` | Generate test cases (happy path + edges + failures) |
-| `aimigration` | Database migration plan (safe + reversible) |
-| `aibench` | Microbenchmark setup |
+### Programming / DevX (8)
 
-### Web / Frontend
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aiplan` | Software architecture / implementation plan | Structured plan: Context, Approach, Files to modify, Existing utilities to reuse, Verification. Lists *specific* files and reuses prior abstractions instead of starting from scratch. |
+| `aireview` | Senior code review | Findings ranked by severity across Correctness, Security, Performance, Maintainability — high-confidence issues only, no style nits. |
+| `airefactor` | Refactor for clarity | A behaviour-preserving rewrite plus a diff-level summary of *what* changed and *why*; explicitly forbids feature creep. |
+| `airegex` | Regex + explanation | The pattern (flavour-labelled), a token-by-token breakdown, a positive/negative test table, common gotchas. |
+| `aisql` | SQL from natural language | The query (formatted), index/EXPLAIN notes, edge-case warnings, sample expected rows. |
+| `aitest` | Test cases | Happy path + edge cases + failure modes, in your test framework's idiomatic style. Avoids redundant "test that 1+1==2" bloat. |
+| `aimigration` | Safe + reversible DB migration | Phased plan: pre-deploy / deploy / post-deploy steps, rollback recipe, lock-impact estimate, smoke-test queries. |
+| `aibench` | Microbenchmark setup | Benchmark code (criterion / vitest bench / pytest-benchmark), what it controls for, comparison baseline, expected-noise notes. |
 
-| Abbreviation | Title |
-|---|---|
-| `aithumb` | Open Graph thumbnail design (1200×630) |
-| `aimobile` | PWA mobile optimization audit |
-| `aia11y` | Accessibility audit (WCAG 2.2 AA) |
-| `aiseo` | SEO audit + meta-data optimization |
-| `aicomponent` | Reusable UI component design |
+### Web / Frontend (5)
 
-### IT Security
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aithumb` | Open Graph thumbnail | A 1200×630 design spec: typography, contrast, focal hierarchy, fallback rules, A/B angles. Optimised for both small Slack-card and full-size renders. |
+| `aimobile` | PWA mobile audit | Findings + fixes for manifest, viewport, touch targets, offline cache, install prompt, perceived perf. |
+| `aia11y` | WCAG 2.2 AA audit | Findings ranked by Perceivable / Operable / Understandable / Robust; concrete CSS / ARIA fixes per item. |
+| `aiseo` | SEO + meta audit | Indexability, on-page (titles/meta/canonical), content depth, structured data, internal linking — only *real* issues, no padding. |
+| `aicomponent` | Reusable UI component | Props table (precise types), composition slots, a11y notes, states (loading/error/empty), test plan, usage examples. |
 
-| Abbreviation | Title |
-|---|---|
-| `aithreat` | STRIDE threat model |
-| `aipentest` | Web pentest checklist (OWASP Top 10 mapped) |
-| `aiauth` | Auth design (sessions / tokens / OAuth) |
-| `aigdpr` | GDPR / privacy compliance review |
+### IT Security (4)
 
-### Business workflows
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aithreat` | STRIDE threat model | DFD sketch (ASCII/Mermaid), per-element STRIDE table, top-N prioritised mitigations, residual risks. |
+| `aipentest` | Web pentest checklist | OWASP Top 10–mapped checklist tailored to the actual app (skips irrelevant checks), with concrete test commands per item. |
+| `aiauth` | Auth design | Threat scope, identity provider choice, session strategy, MFA, endpoint table, authorisation model, OpenAPI sketch. |
+| `aigdpr` | GDPR / privacy review | Per-article walkthrough (Art. 6 lawful basis, data minimisation, retention, DSAR, transfers, DPIA trigger). Skips inapplicable areas. |
 
-| Abbreviation | Title |
-|---|---|
-| `aibrief` | Project brief (scope + success criteria) |
-| `airfp` | RFP evaluation matrix |
-| `aiokr` | OKRs for a team / quarter |
-| `aichange` | Change management plan |
+### Business workflows (4)
 
-### Data analysis
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aibrief` | Project brief | One-page brief: Problem, Objective, Scope (in/out), Success criteria, Risks. Designed for fast alignment, not as a contract. |
+| `airfp` | RFP evaluation matrix | Weighted criteria (sum=100), per-vendor scorecards, hard-fails surfaced, recommendation with second-place rationale. |
+| `aiokr` | OKRs for a team / quarter | 3–5 Objectives × 3 Key Results each. KRs are outcome-not-output, measurable, time-bound, with stretch %. |
+| `aichange` | Change management plan | What's changing, audience analysis, comms timeline, training plan, rollback recipe, success metrics. |
 
-| Abbreviation | Title |
-|---|---|
-| `aidataq` | Data quality audit |
-| `aiml` | ML pipeline design |
-| `aidashboard` | Dashboard design (KPIs + layout) |
+### Data analysis (3)
 
-### Architecture / API
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aidataq` | Data quality audit | Findings across Completeness / Validity / Uniqueness / Consistency / Timeliness / Accuracy, each with sample queries and remediation. |
+| `aiml` | ML pipeline design | Problem classification, data plan, feature engineering, model choice + baseline, evaluation, serving, monitoring, MLOps. |
+| `aidashboard` | Dashboard (KPIs + layout) | Audience analysis, KPI hierarchy (north star → leading → lagging), layout sketch, drill-paths, refresh cadence. |
 
-| Abbreviation | Title |
-|---|---|
-| `aiapi` | REST API design |
+### Architecture / API (1)
+
+| Abbreviation | Title | What you get back |
+|---|---|---|
+| `aiapi` | REST API design | Resources, endpoint table (verbs/paths/auth/rate limits), error model, idempotency, versioning, OpenAPI 3.1 outline. |
 
 ## Using a prompt
 
