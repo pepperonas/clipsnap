@@ -12,7 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   - **macOS:** uses Apple's own `NSColorSampler` (AppKit, 10.15+) — the same magnifier-loupe used by Pages, Keynote, and Sketch. Clicking outside the loupe cancels.
   - **Windows:** spawns a fullscreen layered overlay; click anywhere on screen to sample (`GetPixel` on the desktop DC). Press Esc to cancel.
   - **Async architecture.** The `pick_screen_color` IPC returns immediately; the result arrives later via the `color-picked` Tauri event with `string | null` payload. Keeps the UI responsive while the user is targeting their click.
-  - New module `core/rust-lib/src/screen_picker.rs` (≈170 lines, fully `#[cfg(target_os = …)]`-gated). Adds `objc2` 0.6 + `block2` 0.6 as macOS-only deps for the Objective-C runtime calls; Windows reuses the existing `windows` 0.61 crate with extra features (`Win32_UI_WindowsAndMessaging`, `Win32_Graphics_Gdi`, `Win32_UI_Input_KeyboardAndMouse`).
+  - New module `core/rust-lib/src/screen_picker.rs` (≈180 lines, fully `#[cfg(target_os = …)]`-gated). Adds `objc2` 0.6 + `block2` 0.6 as macOS-only deps for the Objective-C runtime calls; Windows reuses the existing `windows` 0.61 crate with extra features (`Win32_UI_WindowsAndMessaging`, `Win32_Graphics_Gdi`, `Win32_UI_Input_KeyboardAndMouse`).
+  - **Tahoe quirk worth knowing.** macOS Tahoe's `NSColorSampler` only renders its loupe when the calling app is a *Regular* (Dock-visible) NSApplication. ClipSnap normally runs as `Accessory` (Dock-hidden tray app), so the picker briefly promotes the activation policy to Regular while the loupe is up, then demotes back 500 ms after the popup is restored. The popup itself stays visible during the pick — hiding it kills the loupe rendering ("no key window → no loupe").
+
+### Docs
+
+- README tagline updated to "Windows 11 & macOS"; previously said Windows 11 only.
+- New / refreshed badges: separate Windows / macOS / Apple Silicon platform badges, plus Vite 7, ESLint flat-config, Vitest 3, cargo-test count, last-commit, repo-size, code-size, top-language.
+- `docs/colors.md` rewritten end-to-end to describe the v0.5.x custom HSV modal, the click-to-select UX, and the screen eyedropper. The old "OS-native NSColorPanel / Win32 ChooseColor / GTK ColorChooser" copy was outdated since v0.5.0.
 
 ## [0.5.1] — 2026-05-06
 
