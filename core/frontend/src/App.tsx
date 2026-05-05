@@ -39,6 +39,11 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>("history");
   const [matchingSnippets, setMatchingSnippets] = useState<Snippet[]>([]);
   const [version, setVersion] = useState<string | undefined>(undefined);
+  // Sticky banner shown when a paste fails. `"ax"` = macOS Accessibility
+  // not granted (we surface it as a clear "fix this in Settings" CTA);
+  // `"other"` = anything else (rare; shown as a generic "Paste failed").
+  // Auto-dismisses after 8 s.
+  const [pasteError, setPasteError] = useState<null | "ax" | "other">(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Pulled once from tauri.conf.json via the core:app permission set.
@@ -47,6 +52,13 @@ function App() {
   useEffect(() => {
     getVersion().then(setVersion).catch(() => undefined);
   }, []);
+
+  // Auto-dismiss the paste-failure banner.
+  useEffect(() => {
+    if (!pasteError) return;
+    const id = window.setTimeout(() => setPasteError(null), 8000);
+    return () => window.clearTimeout(id);
+  }, [pasteError]);
 
   const filteredClips = useFuzzySearch(entries, query);
 
@@ -145,6 +157,15 @@ function App() {
       }
     } catch (e) {
       console.error("paste failed", e);
+      // The backend returns the sentinel "ax.permission_denied" when
+      // Accessibility isn't granted, so we can show a tailored prompt
+      // pointing the user at the Settings tab.
+      const msg = String(e);
+      if (msg.includes("ax.permission_denied")) {
+        setPasteError("ax");
+      } else {
+        setPasteError("other");
+      }
     }
   };
 
@@ -194,6 +215,49 @@ function App() {
   return (
     <div className="flex h-screen w-screen p-2">
       <div className="app-shell fade-in flex h-full w-full flex-col">
+
+        {/* Paste-failure banner — sticky at the top, click-to-dismiss. */}
+        {pasteError && (
+          <div
+            className={
+              "flex items-start gap-2 border-b px-4 py-2 text-[12px] " +
+              (pasteError === "ax"
+                ? "border-amber-500/40 bg-amber-500/10"
+                : "border-red-500/40 bg-red-500/10")
+            }
+          >
+            <span className="flex-1">
+              {pasteError === "ax" ? (
+                <>
+                  <b>Paste failed — macOS Accessibility access not granted.</b>{" "}
+                  Open the <b>Settings</b> tab and click <b>Force re-grant</b>{" "}
+                  in the amber banner. After granting in System Settings, click{" "}
+                  <b>Restart now</b>.
+                </>
+              ) : (
+                <b>Paste failed.</b>
+              )}
+            </span>
+            {pasteError === "ax" && (
+              <button
+                onClick={() => {
+                  setActiveTab("settings");
+                  setPasteError(null);
+                }}
+                className="rounded bg-amber-500/30 px-2 py-0.5 text-[11px] font-medium hover:bg-amber-500/40"
+              >
+                Open Settings
+              </button>
+            )}
+            <button
+              onClick={() => setPasteError(null)}
+              className="rounded px-1.5 text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Header — fixed height, tab buttons anchored top-right */}
         <div className="relative shrink-0">

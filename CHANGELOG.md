@@ -4,6 +4,23 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-05-06
+
+### Fixed — Accessibility prompt fired on every paste
+
+- **The actual root cause of "permission keeps re-prompting" is finally identified and fixed.** `enigo`'s `Settings::default()` ships with `open_prompt_to_get_permissions = true` on macOS — meaning every `Enigo::new()` call internally invokes `AXIsProcessTrustedWithOptions` *with the prompt option enabled*. So **every paste action on an untrusted process fired the standard "ClipSnap would like to control this computer" dialog as a side effect** — even though we just wanted to silently fall back. — *#fix(macos)*
+  - **Fix:** new `enigo_settings()` helper in `paste.rs`, `expander.rs`, and `text_field/windows.rs` constructs `Settings { open_prompt_to_get_permissions: false, ..Settings::default() }`. Every `Enigo::new()` now uses it. enigo silently returns `NoPermission` when the process is untrusted; the dialog never fires as a paste-time side effect.
+  - **Plus AX guard at the top of every paste IPC.** `paste_entry`, `paste_entry_formatted`, `paste_text`, `paste_snippet`, `paste_note`, `paste_note_formatted` all start with `require_accessibility()?` — short-circuits before even touching enigo and returns the structured `ax.permission_denied` error string to the frontend.
+  - **Frontend toast.** `App.tsx` catches paste errors and renders an amber sticky banner: *"Paste failed — macOS Accessibility access not granted. Open the Settings tab and click Force re-grant…"* with an **Open Settings** button. Auto-dismisses after 8 s. The user finally has clear feedback instead of a silent failure or a recurring system dialog.
+- **Live-debug methodology** documented in the commit history (kept in `git log` rather than the codebase): a temporary background AX-poller revealed that `AXIsProcessTrusted()` does *not* cache per-process on Tahoe — it re-queries TCC on every call. So our SettingsPanel polling has always been correct; the `ax.permission_denied` toast is the right user-facing complement.
+
+### Changed — Color picker UX
+
+- **Modal opens in a "no selection yet" state.** v0.5.0 default-filled the picker with `#3366FF` so the toolbar-button click felt like it had already selected a color. Now the modal opens with: empty hex input, dashed-border placeholder swatch reading "Click in the picker above (or type a hex) to select a color", and Copy disabled. **The first click in the SV picker is the selection** — matching the user's mental model of "1st click opens, 2nd click selects". — *#fix(colors)*
+  - SV-picker crosshair indicator hidden until first click.
+  - Hue-slider drag and hex-input typing also count as "selection" once the user engages with them.
+  - Closing & re-opening the modal resets to the no-selection state.
+
 ## [0.5.0] — 2026-05-05
 
 ### Added — 25 default AI prompt snippets, working color picker
@@ -400,6 +417,7 @@ These are documented in [`docs/text-expander.md`](./docs/text-expander.md), surf
 - System tray menu: Open · Pause Capture · Clear History · Start with Windows · Quit.
 - pnpm + Cargo workspaces with shared [`core/`](./core) and [`win/`](./win) bundle shell.
 
+[0.5.1]: https://github.com/pepperonas/clipsnap/releases/tag/v0.5.1
 [0.5.0]: https://github.com/pepperonas/clipsnap/releases/tag/v0.5.0
 [0.4.2]: https://github.com/pepperonas/clipsnap/releases/tag/v0.4.2
 [0.4.1]: https://github.com/pepperonas/clipsnap/releases/tag/v0.4.1

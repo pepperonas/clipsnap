@@ -54,6 +54,26 @@ pub fn search_history(
 /// want to drop the source app's styling when pasting elsewhere.
 const KEY_PLAIN_TEXT_ONLY: &str = "paste.plain_text_only";
 
+/// Sentinel error string the frontend recognises and presents as the
+/// "Accessibility access required" toast. Kept stable so the JS side
+/// can switch on it without parsing localized text.
+const ERR_NO_ACCESSIBILITY: &str = "ax.permission_denied";
+
+/// Bail-out helper: returns `Err(ERR_NO_ACCESSIBILITY)` when
+/// `accessibility_granted()` is false, so paste IPCs short-circuit
+/// before reaching enigo. Without this guard, paste actions on an
+/// untrusted process would just silently no-op (because we now pass
+/// `open_prompt_to_get_permissions = false` to enigo) — the user
+/// wouldn't know why nothing happened. With this guard, the frontend
+/// gets a structured error and can show a helpful toast.
+fn require_accessibility() -> Result<(), String> {
+    if expander::accessibility_granted() {
+        Ok(())
+    } else {
+        Err(ERR_NO_ACCESSIBILITY.to_string())
+    }
+}
+
 /// Default behaviour: respects the `paste.plain_text_only` setting. For
 /// HTML / RTF entries with the setting on, pastes the plain-text
 /// preview (`content_text`) instead of the formatted payload.
@@ -65,6 +85,7 @@ pub fn paste_entry(
     watcher: State<'_, WatcherState>,
     id: i64,
 ) -> Result<(), String> {
+    require_accessibility()?;
     let entry = db::get(&db, id)
         .map_err(map_err)?
         .ok_or_else(|| "entry not found".to_string())?;
@@ -121,6 +142,7 @@ pub fn paste_entry_formatted(
     watcher: State<'_, WatcherState>,
     id: i64,
 ) -> Result<(), String> {
+    require_accessibility()?;
     let entry = db::get(&db, id)
         .map_err(map_err)?
         .ok_or_else(|| "entry not found".to_string())?;
@@ -171,6 +193,7 @@ pub fn paste_text(
     watcher: State<'_, WatcherState>,
     text: String,
 ) -> Result<(), String> {
+    require_accessibility()?;
     hotkey::hide_popup(&app);
     watcher.mark_self_write(crate::models::ContentType::Text, &text);
     paste::paste_text(&text).map_err(map_err)
@@ -233,6 +256,7 @@ pub fn paste_snippet(
     watcher: State<'_, WatcherState>,
     id: i64,
 ) -> Result<(), String> {
+    require_accessibility()?;
     let snippet = snippets::list_all(&db)
         .map_err(map_err)?
         .into_iter()
@@ -345,6 +369,7 @@ pub fn paste_note(
     watcher: State<'_, WatcherState>,
     id: i64,
 ) -> Result<(), String> {
+    require_accessibility()?;
     let note = notes::get(&db, id)
         .map_err(map_err)?
         .ok_or_else(|| "note not found".to_string())?;
@@ -378,6 +403,7 @@ pub fn paste_note_formatted(
     watcher: State<'_, WatcherState>,
     id: i64,
 ) -> Result<(), String> {
+    require_accessibility()?;
     let note = notes::get(&db, id)
         .map_err(map_err)?
         .ok_or_else(|| "note not found".to_string())?;

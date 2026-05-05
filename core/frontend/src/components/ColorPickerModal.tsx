@@ -33,21 +33,40 @@ type Format = "hex" | "rgb" | "hsl";
  * (HEX, RGB, HSL) are derived on demand.
  */
 export function ColorPickerModal({ open, onClose }: Props) {
-  // Default to a pleasant blue.
+  // Default *position* (hue/sat/val are tracked even before "selection")
+  // so the SV picker has a sane initial hue background.
   const [hue, setHue] = useState(220);
   const [sat, setSat] = useState(80);
   const [val, setVal] = useState(95);
-  const [hexInput, setHexInput] = useState("#3366FF");
+  // The user explicitly asked for a "click-to-select" UX: opening the
+  // modal should NOT pre-fill a color. The big swatch and the
+  // Hex/RGB/HSL outputs stay empty until the first click in the SV
+  // picker (or a manual hex entry). This makes the toolbar button
+  // click count as "click 1 (open)" and the SV-picker click as
+  // "click 2 (select)" — matching the user's mental model.
+  const [hasSelection, setHasSelection] = useState(false);
+  const [hexInput, setHexInput] = useState("");
   const [hexInputValid, setHexInputValid] = useState(true);
   const [format, setFormat] = useState<Format>("hex");
   const [copied, setCopied] = useState(false);
 
-  // Re-sync the hex input whenever the HSV sliders move.
+  // Reset selection when the modal closes so re-opening starts fresh.
   useEffect(() => {
+    if (!open) {
+      setHasSelection(false);
+      setHexInput("");
+      setCopied(false);
+    }
+  }, [open]);
+
+  // Once the user has selected a color (via SV picker, hue slider, or
+  // hex input), keep the hex input synced with the HSV state.
+  useEffect(() => {
+    if (!hasSelection) return;
     const [r, g, b] = hsvToRgb(hue, sat, val);
     setHexInput(rgbToHex(r, g, b));
     setHexInputValid(true);
-  }, [hue, sat, val]);
+  }, [hue, sat, val, hasSelection]);
 
   // Reset the "Copied!" feedback when the user moves the sliders.
   useEffect(() => {
@@ -91,6 +110,7 @@ export function ColorPickerModal({ open, onClose }: Props) {
       setSat(ss);
       setVal(vv);
       setHexInputValid(true);
+      setHasSelection(true);
     } else {
       setHexInputValid(false);
     }
@@ -128,29 +148,46 @@ export function ColorPickerModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        {/* Saturation/Value 2D picker */}
+        {/* Saturation/Value 2D picker. The crosshair is only visible
+            once the user has picked a color — first click in the SV
+            picker is the "selection" action. */}
         <SVPicker
           hue={hue}
           sat={sat}
           val={val}
+          showCursor={hasSelection}
           onChange={(s, v) => {
             setSat(s);
             setVal(v);
+            setHasSelection(true);
           }}
         />
 
         {/* Hue slider */}
         <div className="mt-3">
-          <HueSlider hue={hue} onChange={setHue} />
+          <HueSlider
+            hue={hue}
+            onChange={(h) => {
+              setHue(h);
+              setHasSelection(true);
+            }}
+          />
         </div>
 
-        {/* Big preview swatch */}
-        <div
-          className="mt-3 flex h-16 items-center justify-center rounded border border-[var(--color-border)] font-[var(--font-mono)] text-[16px] font-semibold tracking-wide"
-          style={{ backgroundColor: hex, color: fg }}
-        >
-          {hex}
-        </div>
+        {/* Big preview swatch — neutral placeholder until a color
+            is selected. */}
+        {hasSelection ? (
+          <div
+            className="mt-3 flex h-16 items-center justify-center rounded border border-[var(--color-border)] font-[var(--font-mono)] text-[16px] font-semibold tracking-wide"
+            style={{ backgroundColor: hex, color: fg }}
+          >
+            {hex}
+          </div>
+        ) : (
+          <div className="mt-3 flex h-16 items-center justify-center rounded border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] text-[12px] text-[var(--color-muted)]">
+            Click in the picker above (or type a hex) to select a color
+          </div>
+        )}
 
         {/* Hex input */}
         <div className="mt-3 flex items-center gap-2">
@@ -191,8 +228,8 @@ export function ColorPickerModal({ open, onClose }: Props) {
               {f}
             </button>
           ))}
-          <code className="ml-2 flex-1 truncate rounded bg-[var(--color-surface)] px-2 py-1 font-[var(--font-mono)] text-[12px]">
-            {outputs[format]}
+          <code className="ml-2 flex-1 truncate rounded bg-[var(--color-surface)] px-2 py-1 font-[var(--font-mono)] text-[12px] text-[var(--color-muted)]">
+            {hasSelection ? outputs[format] : "—"}
           </code>
         </div>
 
@@ -206,12 +243,14 @@ export function ColorPickerModal({ open, onClose }: Props) {
           </button>
           <button
             onClick={() => void onCopy()}
+            disabled={!hasSelection}
             className={
-              "flex items-center gap-1.5 rounded px-3 py-1 text-[12px] font-medium " +
+              "flex items-center gap-1.5 rounded px-3 py-1 text-[12px] font-medium disabled:opacity-50 " +
               (copied
                 ? "bg-emerald-500 text-white"
                 : "bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:opacity-90")
             }
+            title={hasSelection ? `Copy ${format.toUpperCase()} to clipboard` : "Pick a color first"}
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
             {copied ? "Copied!" : `Copy ${format.toUpperCase()}`}
@@ -228,11 +267,15 @@ function SVPicker({
   hue,
   sat,
   val,
+  showCursor,
   onChange,
 }: {
   hue: number;
   sat: number;
   val: number;
+  /** Whether to render the crosshair indicator. Hidden in
+   *  no-selection-yet state so the user sees a clean picker on open. */
+  showCursor: boolean;
   onChange: (sat: number, val: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -282,11 +325,13 @@ function SVPicker({
         className="pointer-events-none absolute inset-0"
         style={{ background: "linear-gradient(to top, #000, rgba(0,0,0,0))" }}
       />
-      {/* Crosshair indicator */}
-      <div
-        className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
-        style={{ left: `${sat}%`, top: `${100 - val}%` }}
-      />
+      {/* Crosshair indicator — only after the user has selected. */}
+      {showCursor && (
+        <div
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
+          style={{ left: `${sat}%`, top: `${100 - val}%` }}
+        />
+      )}
     </div>
   );
 }

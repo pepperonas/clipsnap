@@ -12,6 +12,24 @@ use std::time::Duration;
 
 use crate::models::{ClipEntry, ContentType};
 
+/// Build enigo `Settings` with `open_prompt_to_get_permissions = false`.
+///
+/// **Critical macOS behaviour.** `Settings::default()` ships with
+/// `open_prompt_to_get_permissions = true`, which makes `Enigo::new()`
+/// internally call `AXIsProcessTrustedWithOptions` *with the prompt
+/// option enabled*. Every `Enigo::new()` call on an untrusted process
+/// then triggers the standard "would like to control" dialog as a side
+/// effect — exactly the noise we hit after every cdhash-changing
+/// rebuild. With this flag flipped to `false`, enigo silently returns
+/// `NewConError::NoPermission` and we surface the permission state via
+/// our own UI instead.
+fn enigo_settings() -> Settings {
+    Settings {
+        open_prompt_to_get_permissions: false,
+        ..Settings::default()
+    }
+}
+
 /// Write `entry` to the OS clipboard, then simulate Cmd+V (macOS) / Ctrl+V
 /// (Windows / Linux) to paste into the window that had focus before the
 /// popup opened. Caller should hide the popup (and on macOS the whole app)
@@ -96,7 +114,7 @@ fn focus_settle_delay() -> Duration {
 }
 
 fn send_paste_shortcut() -> Result<()> {
-    let mut enigo = Enigo::new(&Settings::default())
+    let mut enigo = Enigo::new(&enigo_settings())
         .map_err(|e| anyhow!("enigo init failed: {e:?}"))?;
 
     // macOS paste = Cmd+V; Windows/Linux paste = Ctrl+V.

@@ -34,6 +34,17 @@ use crate::db::DbHandle;
 use crate::snippets;
 use crate::text_field::{default_field_access, native_path, CapturePath};
 
+/// enigo `Settings` with `open_prompt_to_get_permissions = false` —
+/// see paste.rs for the full rationale. Every `Enigo::new()` here uses
+/// this so untrusted-process calls fail silently rather than firing
+/// the macOS dialog as a side effect.
+fn enigo_settings() -> Settings {
+    Settings {
+        open_prompt_to_get_permissions: false,
+        ..Settings::default()
+    }
+}
+
 // Whether the OS has granted ClipSnap permission to synthesize keyboard
 // events (macOS Accessibility / "Privacy & Security" → Accessibility).
 // `enigo` silently no-ops without it on macOS — the hotkey fires, the
@@ -430,7 +441,7 @@ fn cmd_modifier() -> Key {
 }
 
 fn select_previous_word() -> Result<()> {
-    let mut e = Enigo::new(&Settings::default())
+    let mut e = Enigo::new(&enigo_settings())
         .map_err(|err| anyhow!("enigo init failed: {err:?}"))?;
     let modifier = word_modifier();
     e.key(modifier, Press)
@@ -457,7 +468,7 @@ fn send_paste() -> Result<()> {
 }
 
 fn send_modified_letter(letter: char) -> Result<()> {
-    let mut e = Enigo::new(&Settings::default())
+    let mut e = Enigo::new(&enigo_settings())
         .map_err(|err| anyhow!("enigo init failed: {err:?}"))?;
     let m = cmd_modifier();
     e.key(m, Press)

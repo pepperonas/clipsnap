@@ -1,7 +1,7 @@
 {
   "name": "clipsnap",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Fast, lightweight clipboard history manager. Windows-first, cross-platform via Tauri 2.",
   "license": "MIT",
   "author": "Martin Pfeffer <martinpaush@gmail.com>",

@@ -134,7 +134,14 @@ impl FieldAccess for UiaFieldAccess {
         };
         let backspaces = word.chars().count();
 
-        let mut e = Enigo::new(&Settings::default())
+        // `open_prompt_to_get_permissions: false` is a no-op on
+        // Windows (macOS-only flag) but we set it everywhere for
+        // consistency with the paste / expander modules.
+        let settings = Settings {
+            open_prompt_to_get_permissions: false,
+            ..Settings::default()
+        };
+        let mut e = Enigo::new(&settings)
             .map_err(|err| anyhow!("enigo init failed: {err:?}"))?;
         for _ in 0..backspaces {
             e.key(Key::Backspace, Press)
