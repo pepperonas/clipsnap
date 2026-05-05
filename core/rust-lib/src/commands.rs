@@ -574,14 +574,19 @@ pub fn relaunch_app(app: AppHandle) {
 /// pixels including the popup's).
 #[tauri::command]
 pub fn pick_screen_color(app: AppHandle) -> Result<(), String> {
-    // Suppress the focus-loss auto-hide handler so the popup stays
-    // visible while NSColorSampler's loupe is up. Hiding the popup
-    // entirely turned out to break the loupe rendering on macOS Tahoe
-    // (no key window → no loupe), so we keep it visible. The popup is
-    // alwaysOnTop and may obscure parts of the desktop — the user can
-    // move it before picking, or pick from any area it doesn't cover.
+    use tauri::Manager;
+
+    // The popup is `alwaysOnTop`. NSColorSampler renders its loupe at
+    // a window level just BELOW alwaysOnTop on macOS Tahoe — leaving
+    // the popup visible obscures the loupe entirely, so the user can't
+    // see what they're sampling. Hide the popup before showing the
+    // sampler; it gets re-shown by `clear_pick_suppress_hide` once the
+    // user clicks (or cancels).
     if let Some(ui) = app.try_state::<UiState>() {
         ui.suppress_hide.store(true, Ordering::Relaxed);
+    }
+    if let Some(w) = app.get_webview_window(crate::hotkey::POPUP_LABEL) {
+        let _ = w.hide();
     }
 
     #[cfg(target_os = "macos")]
