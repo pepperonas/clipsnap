@@ -28,6 +28,9 @@ parking_lot = { workspace = true }
 base64 = { workspace = true }
 dirs = { workspace = true }
 clipboard-rs = { workspace = true }
+aes-gcm = { workspace = true }
+rand = { workspace = true }
+keyring = { workspace = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = { workspace = true }

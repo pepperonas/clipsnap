@@ -115,22 +115,24 @@ pub fn find_by_query(db: &DbHandle, query: &str) -> Result<Vec<Snippet>> {
 
 pub fn create(db: &DbHandle, abbreviation: &str, title: &str, body: &str) -> Result<i64> {
     let now = Utc::now().timestamp_millis();
+    let enc_body = crate::crypto::encrypt(body);
     let conn = db.lock();
     conn.execute(
         "INSERT INTO snippets (abbreviation, title, body, created_at, updated_at) \
          VALUES (?1, ?2, ?3, ?4, ?4)",
-        params![abbreviation.trim(), title.trim(), body, now],
+        params![abbreviation.trim(), title.trim(), enc_body, now],
     )?;
     Ok(conn.last_insert_rowid())
 }
 
 pub fn update(db: &DbHandle, id: i64, abbreviation: &str, title: &str, body: &str) -> Result<()> {
     let now = Utc::now().timestamp_millis();
+    let enc_body = crate::crypto::encrypt(body);
     let conn = db.lock();
     conn.execute(
         "UPDATE snippets SET abbreviation = ?1, title = ?2, body = ?3, updated_at = ?4 \
          WHERE id = ?5",
-        params![abbreviation.trim(), title.trim(), body, now, id],
+        params![abbreviation.trim(), title.trim(), enc_body, now, id],
     )?;
     Ok(())
 }
@@ -150,6 +152,7 @@ pub fn upsert_by_abbreviation(
     body: &str,
 ) -> Result<()> {
     let now = Utc::now().timestamp_millis();
+    let enc_body = crate::crypto::encrypt(body);
     let conn = db.lock();
     conn.execute(
         r#"
@@ -160,7 +163,7 @@ pub fn upsert_by_abbreviation(
             body       = excluded.body,
             updated_at = excluded.updated_at
         "#,
-        params![abbreviation.trim(), title.trim(), body, now],
+        params![abbreviation.trim(), title.trim(), enc_body, now],
     )?;
     Ok(())
 }
@@ -235,11 +238,12 @@ pub fn import_from_json(db: &DbHandle, json: &str) -> Result<ImportResult> {
 }
 
 fn row_to_snippet(row: &rusqlite::Row<'_>) -> rusqlite::Result<Snippet> {
+    let raw_body: String = row.get(3)?;
     Ok(Snippet {
         id: row.get(0)?,
         abbreviation: row.get(1)?,
         title: row.get(2)?,
-        body: row.get(3)?,
+        body: crate::crypto::decrypt(&raw_body),
         created_at: row.get(4)?,
         updated_at: row.get(5)?,
     })

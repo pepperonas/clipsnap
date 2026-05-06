@@ -3,7 +3,7 @@ resolver = "2"
 members = ["core/rust-lib", "win/src-tauri", "macos/src-tauri"]
 
 [workspace.package]
-version = "0.5.2"
+version = "0.6.0"
 edition = "2021"
 authors = ["Martin Pfeffer <martinpaush@gmail.com>"]
 license = "MIT"
@@ -26,6 +26,13 @@ chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 rusqlite = { version = "0.32", features = ["bundled"] }
 base64 = "0.22"
+# At-rest content encryption (entries / snippets / notes bodies). AES-256-GCM
+# is the modern AEAD with hardware acceleration on both AArch64 and x86-64.
+aes-gcm = "0.10"
+rand = "0.8"
+# OS keychain-backed key storage. macOS Keychain / Windows Credential
+# Manager / Linux Secret Service — single API, transparent fallback.
+keyring = "3"
 
 # OS integration
 clipboard-rs = "0.2"

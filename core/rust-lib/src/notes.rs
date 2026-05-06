@@ -76,6 +76,7 @@ pub fn list_categories(db: &DbHandle) -> Result<Vec<String>> {
 pub fn create_text(db: &DbHandle, title: &str, body: &str, category: &str) -> Result<i64> {
     let now = Utc::now().timestamp_millis();
     let body_len = body.len() as i64;
+    let enc_body = crate::crypto::encrypt(body);
     let conn = db.lock();
     conn.execute(
         r#"
@@ -84,7 +85,7 @@ pub fn create_text(db: &DbHandle, title: &str, body: &str, category: &str) -> Re
             title, category, byte_size, created_at, updated_at
         ) VALUES ('text', ?1, ?1, ?2, ?3, ?4, ?5, ?5)
         "#,
-        params![body, title.trim(), category.trim(), body_len, now],
+        params![enc_body, title.trim(), category.trim(), body_len, now],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -123,6 +124,11 @@ pub fn save_from_clip(
         return Ok(None);
     };
 
+    // `text` and `data` came out of `entries` *already* encrypted (we
+    // didn't run them through `row_to_entry`'s decrypt). Both tables
+    // use the same cipher, so passing the ciphertext straight into
+    // `notes.content_text` / `notes.content_data` is correct — the
+    // value will round-trip cleanly when `row_to_note` decrypts it.
     conn.execute(
         r#"
         INSERT INTO notes (
@@ -162,6 +168,7 @@ pub fn update(
     let editable = matches!(ct.as_str(), "text" | "html" | "rtf");
     if editable {
         let body_len = body.len() as i64;
+        let enc_body = crate::crypto::encrypt(body);
         conn.execute(
             r#"
             UPDATE notes
@@ -170,7 +177,7 @@ pub fn update(
                 byte_size = ?4, updated_at = ?5
             WHERE id = ?6
             "#,
-            params![title.trim(), category.trim(), body, body_len, now, id],
+            params![title.trim(), category.trim(), enc_body, body_len, now, id],
         )?;
     } else {
         conn.execute(
@@ -220,6 +227,11 @@ pub fn append_imported(
     db: &DbHandle,
     note: &Note,
 ) -> Result<i64> {
+    // The note we're given has plaintext bodies (the JSON backup
+    // format is plaintext). Encrypt before storing so the on-disk
+    // shape matches everything else in this table.
+    let enc_text = crate::crypto::encrypt(&note.content_text);
+    let enc_data = crate::crypto::encrypt(&note.content_data);
     let conn = db.lock();
     conn.execute(
         r#"
@@ -230,8 +242,8 @@ pub fn append_imported(
         "#,
         params![
             note.content_type.as_str(),
-            note.content_text,
-            note.content_data,
+            enc_text,
+            enc_data,
             note.title.trim(),
             note.category.trim(),
             note.byte_size,
@@ -245,11 +257,13 @@ pub fn append_imported(
 fn row_to_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<Note> {
     let ct_str: String = row.get(1)?;
     let content_type = ContentType::from_str(&ct_str).unwrap_or(ContentType::Text);
+    let raw_text = row.get::<_, Option<String>>(2)?.unwrap_or_default();
+    let raw_data = row.get::<_, Option<String>>(3)?.unwrap_or_default();
     Ok(Note {
         id: row.get(0)?,
         content_type,
-        content_text: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
-        content_data: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+        content_text: crate::crypto::decrypt(&raw_text),
+        content_data: crate::crypto::decrypt(&raw_data),
         title: row.get(4)?,
         category: row.get(5)?,
         byte_size: row.get(6)?,

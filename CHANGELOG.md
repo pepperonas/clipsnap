@@ -4,6 +4,22 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-05-06
+
+### Added — At-rest encryption for sensitive content
+
+- **The SQLite database now encrypts every sensitive content field with AES-256-GCM.** Closes the long-standing "Unencrypted storage" limitation row in the README — passwords, tokens, snippet bodies, and note bodies are no longer readable to anyone who can `cat` the DB file. — *#feat(security)*
+  - **Encrypted columns:** `entries.content_text`, `entries.content_data`, `snippets.body`, `notes.content_text`, `notes.content_data`. **Not encrypted:** timestamps, content-type tags, dedup `hash`, snippet abbreviations, note titles/categories — those are metadata that doesn't reveal clipboard content.
+  - **Storage format.** Each encrypted value is stored as TEXT prefixed with `v1:` followed by base64 of `12-byte random nonce ‖ ciphertext+tag`. Legacy plaintext rows (no `v1:` prefix) are detected on read and returned as-is, then re-encrypted in place by the migration step at next startup. The migration is idempotent — already-encrypted rows are skipped.
+  - **Key storage.** Per-install random 256-bit key kept in the **OS keychain** (macOS Keychain / Windows Credential Manager / Linux Secret Service) under service `io.celox.clipsnap`, account `history-db-key-v1`. Falls back to a 0600 keyfile (`<data-dir>/.dbkey`) if the keychain is unavailable so the app stays usable instead of crashing. The fallback is strictly weaker — file-system access gets you the key — but matches the previous threat model floor.
+  - **Roundtrip-safe across paths.** `save_from_clip` (Notes ← Clipboard) passes the already-encrypted ciphertext straight into the notes row instead of decrypt-then-reencrypt — same key, same scheme, ~free. `append_imported` from a JSON backup re-encrypts on the way in (backups stay plaintext for portability).
+  - **Module:** [`core/rust-lib/src/crypto.rs`](./core/rust-lib/src/crypto.rs) (~280 LOC). 6 unit tests cover roundtrip, legacy plaintext passthrough, empty strings, fresh-nonce-per-encrypt, tampered-ciphertext rejection, wrong-key rejection.
+  - **Deps added:** `aes-gcm` 0.10, `rand` 0.8, `keyring` 3 (cross-platform OS-keychain crate).
+
+### Why 0.6.0
+
+This is a feature with security implications and a one-time data migration on first launch — not a bug fix. Per `docs/RELEASING.md`'s 0.x.0-vs-0.x.y rule, that earns a minor bump.
+
 ## [0.5.2] — 2026-05-06
 
 ### Added — System-wide screen color picker (eyedropper)

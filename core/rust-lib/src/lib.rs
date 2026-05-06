@@ -3,6 +3,7 @@
 mod backup;
 mod clipboard_watcher;
 mod commands;
+mod crypto;
 mod db;
 mod expander;
 mod hotkey;
@@ -47,11 +48,42 @@ pub fn run(context: tauri::Context<Wry>) {
         .setup(|app| {
             let db_path = db::default_db_path()?;
             tracing::info!("db at {}", db_path.display());
+
+            // Initialise at-rest encryption *before* opening the DB so
+            // every subsequent insert/select runs through the cipher.
+            // The data dir is the same parent as the DB file.
+            if let Some(data_dir) = db_path.parent() {
+                if let Err(e) = crypto::init(data_dir) {
+                    tracing::warn!("crypto init failed: {e:#} — DB will be plaintext");
+                }
+            }
+
             let db_handle = db::open(&db_path)?;
 
             snippets::init_table(&db_handle)?;
             notes::init_table(&db_handle)?;
             settings::init_table(&db_handle)?;
+
+            // One-shot migration: rewrite any pre-encryption rows in
+            // place so the next read paths through the cipher cleanly.
+            // Idempotent — already-encrypted rows are skipped.
+            {
+                let conn = db_handle.lock();
+                let mut total = 0usize;
+                for (table, cols) in &[
+                    ("entries", &["content_text", "content_data"][..]),
+                    ("snippets", &["body"][..]),
+                    ("notes", &["content_text", "content_data"][..]),
+                ] {
+                    match crypto::migrate_table(&conn, table, cols) {
+                        Ok(n) => total += n,
+                        Err(e) => tracing::warn!("crypto migrate {table}: {e:#}"),
+                    }
+                }
+                if total > 0 {
+                    tracing::info!("encrypted {total} legacy plaintext field(s) at startup");
+                }
+            }
 
             // First-run: seed the curated default AI-prompt snippets.
             // Idempotent — runs once per database lifetime, then the

@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::crypto;
 use crate::models::{ClipEntry, ContentType, NewClip, MAX_ENTRIES};
 
 pub type DbHandle = Arc<Mutex<Connection>>;
@@ -75,6 +76,12 @@ pub fn upsert_clip(db: &DbHandle, clip: &NewClip) -> Result<i64> {
         )?;
         id
     } else {
+        // `content_text` and `content_data` may contain passwords,
+        // tokens, file paths, image bytes — encrypt at rest. `hash` is
+        // computed over plaintext (kept plaintext for dedup) and
+        // doesn't reveal content beyond duplicate-presence.
+        let enc_text = crypto::encrypt(&clip.content_text);
+        let enc_data = crypto::encrypt(&clip.content_data);
         conn.execute(
             r#"
             INSERT INTO entries (
@@ -84,8 +91,8 @@ pub fn upsert_clip(db: &DbHandle, clip: &NewClip) -> Result<i64> {
             "#,
             params![
                 clip.content_type.as_str(),
-                clip.content_text,
-                clip.content_data,
+                enc_text,
+                enc_data,
                 hash,
                 clip.byte_size,
                 now,
@@ -345,11 +352,13 @@ mod tests {
 fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<ClipEntry> {
     let ct_str: String = row.get(1)?;
     let content_type = ContentType::from_str(&ct_str).unwrap_or(ContentType::Text);
+    let raw_text = row.get::<_, Option<String>>(2)?.unwrap_or_default();
+    let raw_data = row.get::<_, Option<String>>(3)?.unwrap_or_default();
     Ok(ClipEntry {
         id: row.get(0)?,
         content_type,
-        content_text: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
-        content_data: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+        content_text: crypto::decrypt(&raw_text),
+        content_data: crypto::decrypt(&raw_data),
         hash: row.get(4)?,
         byte_size: row.get(5)?,
         created_at: row.get(6)?,

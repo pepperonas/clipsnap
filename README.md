@@ -5,7 +5,7 @@
 
   **Fast, lightweight clipboard history manager + text expander for Windows 11 & macOS**
 
-  [![Version](https://img.shields.io/badge/version-0.5.2-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
+  [![Version](https://img.shields.io/badge/version-0.6.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
   [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
   [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows11&logoColor=white)](./win)
   [![macOS](https://img.shields.io/badge/macOS-10.15+-000000?style=flat-square&logo=apple&logoColor=white)](./macos)
@@ -280,7 +280,7 @@ pnpm check            # cargo clippy (workspace) + tsc --noEmit + eslint
 
 | Limitation | Detail |
 |------------|--------|
-| **Unencrypted storage** | The SQLite history file is unencrypted — passwords and tokens you copy are visible to anyone with filesystem access to your profile. |
+| **At-rest encryption scope** | Sensitive content (clipboard text/HTML/RTF/images, snippet bodies, note bodies) is AES-256-GCM encrypted at rest with a per-install random 256-bit key (v0.6.0+). Key lives in the OS keychain; falls back to a 0600 keyfile in the data dir if the keychain is unavailable. **Not encrypted:** timestamps, content-type tags, dedup hashes, snippet abbreviations, note titles/categories — none of those reveal clipboard content. |
 | **No sensitive-app detection** | ClipSnap captures everything without filtering. |
 | **No cloud sync** | No automatic sync or multi-device support — but the [Backup](./docs/backup.md) export/import gives you a portable JSON file you can move between machines manually. |
 | **File paste fallback** | Setting file-list clipboard payloads from Rust is not universally supported; ClipSnap falls back to pasting the newline-joined list of paths as text. |
