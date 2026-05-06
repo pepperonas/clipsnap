@@ -21,6 +21,8 @@ The status line shows the bytes written, e.g. `Exported 124.5 KB to clipsnap-bac
 
 Sections that are unticked are written as empty `Vec`s in the JSON — version + timestamp are still set so the resulting file is always parseable on import.
 
+> **Encryption note (v0.6.0+).** The DB columns are AES-256-GCM encrypted at rest, but the export file is **plaintext JSON**. Decryption happens at the read path (so the file is portable across machines without sharing your install's key) and re-encryption happens on import (so the destination machine's key is what protects the merged rows). If your backup file is sensitive — and most are — encrypt the file yourself: `gpg --symmetric backup.json`, a password-zipped archive, etc. See [`docs/encryption.md`](./encryption.md) for the full threat model.
+
 ## How to import
 
 1. Open the popup → **Settings** tab → **Backup & restore** → **Import…**.

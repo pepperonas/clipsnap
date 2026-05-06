@@ -189,8 +189,9 @@ clipsnap/
 │   ├── notes.md             # Notes feature — categories, edit semantics, IPC surface
 │   ├── backup.md            # Full-app export/import — schema, merge semantics, jq recipes
 │   ├── text-expander.md     # System-wide expander — workflow, hotkey format, per-OS caveats
-│   ├── colors.md            # Inline hex preview + OS-native color picker
+│   ├── colors.md            # Inline hex preview + custom HSV picker + system eyedropper
 │   ├── ai-prompts.md        # 25 bundled default AI prompt snippets
+│   ├── encryption.md        # AES-256-GCM at-rest encryption — threat model, key storage, migration
 │   ├── RELEASING.md         # Release procedure
 │   └── examples/
 │       └── snippets/        # 5 themed JSON examples + their own README
@@ -280,7 +281,7 @@ pnpm check            # cargo clippy (workspace) + tsc --noEmit + eslint
 
 | Limitation | Detail |
 |------------|--------|
-| **At-rest encryption scope** | Sensitive content (clipboard text/HTML/RTF/images, snippet bodies, note bodies) is AES-256-GCM encrypted at rest with a per-install random 256-bit key (v0.6.0+). Key lives in the OS keychain; falls back to a 0600 keyfile in the data dir if the keychain is unavailable. **Not encrypted:** timestamps, content-type tags, dedup hashes, snippet abbreviations, note titles/categories — none of those reveal clipboard content. |
+| **At-rest encryption scope** | Sensitive content (clipboard text/HTML/RTF/images, snippet bodies, note bodies) is AES-256-GCM encrypted at rest with a per-install random 256-bit key (v0.6.0+). Key lives in the OS keychain; falls back to a 0600 keyfile in the data dir if the keychain is unavailable. **Not encrypted:** timestamps, content-type tags, dedup hashes, snippet abbreviations, note titles/categories — none of those reveal clipboard content. Full reference: [`docs/encryption.md`](./docs/encryption.md). |
 | **No sensitive-app detection** | ClipSnap captures everything without filtering. |
 | **No cloud sync** | No automatic sync or multi-device support — but the [Backup](./docs/backup.md) export/import gives you a portable JSON file you can move between machines manually. |
 | **File paste fallback** | Setting file-list clipboard payloads from Rust is not universally supported; ClipSnap falls back to pasting the newline-joined list of paths as text. |

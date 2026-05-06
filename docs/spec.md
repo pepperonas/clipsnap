@@ -52,7 +52,7 @@ base64 = "0.22"
    - HTML
    - Images (PNG, stored as base64 in SQLite — max 5MB per entry)
    - Files (list of paths)
-3. **SQLite persistence** at `%APPDATA%\ClipSnap\history.db`:
+3. **SQLite persistence** at `%APPDATA%\ClipSnap\history.db` (sensitive columns AES-256-GCM encrypted at rest since v0.6.0 — see [`docs/encryption.md`](./encryption.md)):
    ```sql
    CREATE TABLE IF NOT EXISTS entries (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -233,7 +233,7 @@ get_capture_state() -> bool
 
 - Cloud sync
 - Multi-device
-- Encryption at rest (document limitation in README)
+- ~~Encryption at rest (document limitation in README)~~ — **delivered in v0.6.0**, see [`docs/encryption.md`](./encryption.md)
 - Categories/tags
 - Pin/favorites (can be a v2)
 - Sensitive-app detection
