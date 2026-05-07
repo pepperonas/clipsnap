@@ -32,6 +32,7 @@ export function HistoryList({
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -88,24 +89,32 @@ export function HistoryList({
               Color picker
             </button>
             {onClearAll && clipCount > 0 && (
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Delete all ${clipCount} clipboard ${
-                        clipCount === 1 ? "entry" : "entries"
-                      }? This cannot be undone.`,
-                    )
-                  ) {
-                    onClearAll();
-                  }
-                }}
-                className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--color-surface)] hover:text-red-400"
-                title="Delete all clipboard history"
-              >
-                <Trash2 size={11} />
-                Clear all
-              </button>
+              confirmClear ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-red-400">Delete {clipCount} clip{clipCount === 1 ? "" : "s"}?</span>
+                  <button
+                    onClick={() => { onClearAll(); setConfirmClear(false); }}
+                    className="rounded px-2 py-0.5 text-[11px] text-red-400 hover:bg-red-400/10"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmClear(false)}
+                    className="rounded px-2 py-0.5 text-[11px] text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmClear(true)}
+                  className="flex items-center gap-1 rounded px-2 py-0.5 hover:bg-[var(--color-surface)] hover:text-red-400"
+                  title="Delete all clipboard history"
+                >
+                  <Trash2 size={11} />
+                  Clear all
+                </button>
+              )
             )}
           </div>
         </div>

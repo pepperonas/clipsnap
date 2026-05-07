@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { Bookmark, Calculator, FileCode2, FileText, Files, Image, Palette, Trash2, Type, Zap } from "lucide-react";
+import { memo, useState } from "react";
+import { Bookmark, BookmarkCheck, Calculator, FileCode2, FileText, Files, Image, Palette, Trash2, Type, Zap } from "lucide-react";
 import type { ListEntry } from "../lib/types";
 import { relativeTime, truncateOneLine } from "../lib/format";
 
@@ -39,6 +39,7 @@ export const HistoryItem = memo(function HistoryItem({
   onDelete,
   style,
 }: Props) {
+  const [bookmarkSaved, setBookmarkSaved] = useState(false);
   const isSnippet = entry.kind === "snippet";
   const isCalc = entry.kind === "calc";
   const isColor = entry.kind === "color";
@@ -162,16 +163,21 @@ export const HistoryItem = memo(function HistoryItem({
           onClick={(e) => {
             e.stopPropagation();
             onSaveAsNote();
+            setBookmarkSaved(true);
+            setTimeout(() => setBookmarkSaved(false), 1500);
           }}
-          title="Save as note"
+          title={bookmarkSaved ? "Saved!" : "Save as note"}
           className={
-            "shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 " +
-            (selected
-              ? "text-white/80 hover:bg-white/20"
-              : "text-[var(--color-muted)] hover:bg-[var(--color-border)] hover:text-[var(--color-accent)]")
+            "shrink-0 rounded p-0.5 " +
+            (bookmarkSaved
+              ? "opacity-100 text-[var(--color-accent)]"
+              : "opacity-0 group-hover:opacity-100 " +
+                (selected
+                  ? "text-white/80 hover:bg-white/20"
+                  : "text-[var(--color-muted)] hover:bg-[var(--color-border)] hover:text-[var(--color-accent)]"))
           }
         >
-          <Bookmark size={12} />
+          {bookmarkSaved ? <BookmarkCheck size={12} /> : <Bookmark size={12} />}
         </button>
       )}
       {entry.kind === "clip" && onDelete && (
