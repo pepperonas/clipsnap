@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/clipsnap.png" alt="ClipSnap" width="900" />
   <br />
-  <img src="docs/rust-social-wide.jpg" alt="Built with Rust" width="600" />
+  <img src="docs/rust.png" alt="Built with Rust" width="200" />
 
   # ClipSnap
 
