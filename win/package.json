@@ -1,7 +1,7 @@
 {
   "name": "clipsnap-win",
   "private": true,
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "ClipSnap — Windows bundle shell (Tauri CLI entry + frontend proxy scripts)",
   "scripts": {
     "tauri": "tauri",

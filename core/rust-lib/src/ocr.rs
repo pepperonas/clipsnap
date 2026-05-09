@@ -148,3 +148,12 @@ fn recognize_impl(_png_bytes: &[u8]) -> Result<String> {
     // Implementation pending in a follow-up release.
     anyhow::bail!("OCR is not yet implemented on Windows")
 }
+
+// Catch-all for Linux / other Unixes so the workspace builds in CI even
+// though those targets don't ship the OCR feature yet. Any non-macOS,
+// non-Windows OS lands here and gets a clean error rather than a link
+// failure.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn recognize_impl(_png_bytes: &[u8]) -> Result<String> {
+    anyhow::bail!("OCR is not implemented on this platform")
+}

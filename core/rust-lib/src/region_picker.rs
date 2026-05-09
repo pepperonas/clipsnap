@@ -10,7 +10,12 @@
 //! Windows is stubbed for now — implementation will use either the
 //! `ms-screenclip:` URI handler or a direct GDI overlay later.
 
-use anyhow::{Context, Result};
+// Context is used by the macOS implementation only; Linux / Windows
+// stubs don't need it. Per-platform import keeps clippy happy on all
+// targets without sprinkling allow attributes.
+#[cfg(target_os = "macos")]
+use anyhow::Context;
+use anyhow::Result;
 
 /// User pressed Esc / clicked away — distinct error so the IPC layer
 /// can return success-with-no-text instead of bubbling up a real error.
@@ -82,4 +87,13 @@ fn capture_impl() -> Result<Vec<u8>> {
     // the one in `screen_picker::windows_impl`. Both are non-trivial
     // and OCR shipped first on macOS where Vision is the right backend.
     anyhow::bail!("region capture is not yet implemented on Windows")
+}
+
+// Catch-all for Linux / other Unixes so the workspace builds in CI.
+// Region capture would need an X11 / Wayland-specific overlay; not
+// shipped yet but explicitly handled so cargo doesn't error out at
+// link time on Linux runners.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn capture_impl() -> Result<Vec<u8>> {
+    anyhow::bail!("region capture is not implemented on this platform")
 }

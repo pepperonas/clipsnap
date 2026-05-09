@@ -4,6 +4,17 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2] — 2026-05-09
+
+### Fixed — CI build on Linux runners
+
+- **`ocr.rs` and `region_picker.rs` now have catch-all stubs for non-macOS / non-Windows targets.** Both modules were `#[cfg]`-gated for macOS + Windows but never declared a fallback impl, which made the `pub fn recognize` / `pub fn capture` wrappers fail to resolve their delegated `recognize_impl` / `capture_impl` symbol on Linux. The release CI runs on `ubuntu-latest` and broke as a result. The new stubs return `"OCR is not implemented on this platform"` / `"region capture is not implemented on this platform"`. — *#fix(ci)*
+- Cleaned up the unused `anyhow::Context` import in `region_picker.rs` — only the macOS impl uses it, so it's now `#[cfg(target_os = "macos")] use anyhow::Context;`. Silences the `unused_imports` warning on Linux/Windows builds.
+
+### Changed — README badge wall
+
+- Doubled the badge set with grouped sections (Status / Platforms / Stack / Security / Quality / Community). Adds Linux planned, x86_64, ONNX Runtime, Apple Vision, U²-Net, AES-256-GCM, OS keychain, local-first, no-telemetry, offline, power-user, keyboard-first, Prettier, vitest count, contributors, forks, watchers, closed issues, PRs open, commit activity, lines-of-code. Test-count badge updated 98 → 107 (recolor + cutout + cutout_ml).
+
 ## [0.10.1] — 2026-05-09
 
 ### Added — Save image entry to Downloads

@@ -9,11 +9,23 @@
 
   Searchable history, system-wide snippets, inline calculator, color picker, image recolor + background removal, screen-region OCR — all behind one hotkey, all local, AES-256 encrypted at rest.
 
-  [![Version](https://img.shields.io/badge/version-0.10.1-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
+  <!-- ── Status / release ─────────────────────────────────────── -->
+  [![Version](https://img.shields.io/badge/version-0.10.2-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
   [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+  [![CI](https://img.shields.io/github/actions/workflow/status/pepperonas/clipsnap/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pepperonas/clipsnap/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/actions/workflow/status/pepperonas/clipsnap/release.yml?branch=main&style=flat-square&label=release)](https://github.com/pepperonas/clipsnap/actions/workflows/release.yml)
+  [![Latest Release](https://img.shields.io/github/v/release/pepperonas/clipsnap?style=flat-square&label=download)](https://github.com/pepperonas/clipsnap/releases/latest)
+  [![Maintenance](https://img.shields.io/badge/maintained-yes-brightgreen?style=flat-square)](https://github.com/pepperonas/clipsnap/commits/main)
+  [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](./CONTRIBUTING.md)
+
+  <!-- ── Platforms ────────────────────────────────────────────── -->
   [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows11&logoColor=white)](./win)
   [![macOS](https://img.shields.io/badge/macOS-10.15+-000000?style=flat-square&logo=apple&logoColor=white)](./macos)
   [![Apple Silicon](https://img.shields.io/badge/arm64-Apple%20Silicon-555555?style=flat-square&logo=apple&logoColor=white)](./macos)
+  [![x86_64](https://img.shields.io/badge/x86__64-supported-555555?style=flat-square)](#)
+  [![Linux](https://img.shields.io/badge/Linux-planned-orange?style=flat-square&logo=linux&logoColor=white)](#)
+
+  <!-- ── Stack ────────────────────────────────────────────────── -->
   [![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
   [![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)](https://rustup.rs)
   [![React 19](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
@@ -21,18 +33,46 @@
   [![Vite 7](https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
   [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind-v4-38BDF8?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
   [![pnpm](https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io)
+  [![Node 20](https://img.shields.io/badge/Node-20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
   [![SQLite](https://img.shields.io/badge/SQLite-bundled-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
+  [![ONNX Runtime](https://img.shields.io/badge/ONNX%20Runtime-bundled-005CED?style=flat-square&logo=onnx&logoColor=white)](https://onnxruntime.ai)
+  [![Apple Vision](https://img.shields.io/badge/Apple%20Vision-Live%20Text-000000?style=flat-square&logo=apple&logoColor=white)](#)
+  [![U2Net](https://img.shields.io/badge/U%C2%B2--Net-cutout-orange?style=flat-square)](https://github.com/xuebinqin/U-2-Net)
+
+  <!-- ── Security & ergonomics ───────────────────────────────── -->
+  [![AES-256-GCM](https://img.shields.io/badge/encryption-AES--256--GCM-darkgreen?style=flat-square&logo=letsencrypt&logoColor=white)](./docs/encryption.md)
+  [![Keychain-backed](https://img.shields.io/badge/keys-OS%20keychain-555555?style=flat-square)](./docs/encryption.md)
+  [![Local-first](https://img.shields.io/badge/local--first-yes-brightgreen?style=flat-square)](#)
+  [![No telemetry](https://img.shields.io/badge/telemetry-none-brightgreen?style=flat-square)](#)
+  [![Offline](https://img.shields.io/badge/network-not%20required-brightgreen?style=flat-square)](#)
+  [![Power user](https://img.shields.io/badge/audience-power%20users-blueviolet?style=flat-square)](#)
+  [![Keyboard-first](https://img.shields.io/badge/UX-keyboard--first-blueviolet?style=flat-square)](#)
+
+  <!-- ── Quality ─────────────────────────────────────────────── -->
   [![ESLint](https://img.shields.io/badge/ESLint-flat%20config-4B32C3?style=flat-square&logo=eslint&logoColor=white)](https://eslint.org)
   [![Vitest](https://img.shields.io/badge/Vitest-3-6E9F18?style=flat-square&logo=vitest&logoColor=white)](https://vitest.dev)
-  [![cargo test](https://img.shields.io/badge/cargo%20test-98%20passing-success?style=flat-square&logo=rust&logoColor=white)](#)
+  [![cargo test](https://img.shields.io/badge/cargo%20test-107%20passing-success?style=flat-square&logo=rust&logoColor=white)](#)
+  [![vitest](https://img.shields.io/badge/vitest-86%20passing-success?style=flat-square&logo=vitest&logoColor=white)](#)
+  [![cargo clippy](https://img.shields.io/badge/cargo%20clippy-D%20warnings-success?style=flat-square&logo=rust&logoColor=white)](#)
+  [![tsc strict](https://img.shields.io/badge/tsc-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](#)
+  [![Prettier](https://img.shields.io/badge/code%20style-Prettier-F7B93E?style=flat-square&logo=prettier&logoColor=black)](https://prettier.io)
+
+  <!-- ── Community ───────────────────────────────────────────── -->
   [![Issues](https://img.shields.io/github/issues/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/issues)
+  [![Closed issues](https://img.shields.io/github/issues-closed/pepperonas/clipsnap?style=flat-square&color=success)](https://github.com/pepperonas/clipsnap/issues?q=is%3Aissue+is%3Aclosed)
+  [![PRs](https://img.shields.io/github/issues-pr/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/pulls)
   [![Stars](https://img.shields.io/github/stars/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/stargazers)
+  [![Forks](https://img.shields.io/github/forks/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/network/members)
+  [![Watchers](https://img.shields.io/github/watchers/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/watchers)
+  [![Contributors](https://img.shields.io/github/contributors/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/graphs/contributors)
   [![Last commit](https://img.shields.io/github/last-commit/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/commits/main)
+  [![Commit activity](https://img.shields.io/github/commit-activity/m/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap/commits/main)
   [![Repo size](https://img.shields.io/github/repo-size/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap)
   [![Code size](https://img.shields.io/github/languages/code-size/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap)
   [![Top language](https://img.shields.io/github/languages/top/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap)
-  [![CI](https://img.shields.io/github/actions/workflow/status/pepperonas/clipsnap/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pepperonas/clipsnap/actions/workflows/ci.yml)
-  [![Latest Release](https://img.shields.io/github/v/release/pepperonas/clipsnap?style=flat-square&label=download)](https://github.com/pepperonas/clipsnap/releases/latest)
+  [![Languages](https://img.shields.io/github/languages/count/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap)
+  [![Lines](https://img.shields.io/tokei/lines/github/pepperonas/clipsnap?style=flat-square&label=lines%20of%20code)](https://github.com/pepperonas/clipsnap)
+  [![Made with love](https://img.shields.io/badge/made%20with-%E2%99%A5-red?style=flat-square)](#)
 
   Press `Ctrl+Shift+V` → search → paste. Inspired by Alfred's clipboard viewer on macOS, scoped to one tool you can keep on every machine.
 </div>
@@ -259,7 +299,7 @@ Full feature reference: [`docs/notes.md`](./docs/notes.md). Backup file schema a
 
 ```bash
 pnpm test               # frontend unit tests (vitest + happy-dom) — 86 tests
-cargo test --workspace  # Rust unit tests — 98 tests (db, snippets, notes, backup, settings, expander, text_field, seed, hotkey parser, clipboard_watcher, models, recolor, cutout)
+cargo test --workspace  # Rust unit tests — 107 tests (db, snippets, notes, backup, settings, expander, text_field, seed, hotkey parser, clipboard_watcher, models, recolor, cutout, cutout_ml)
 ```
 
 The same commands run in [GitHub Actions CI](./.github/workflows/ci.yml) on every push and PR.
