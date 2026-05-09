@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ClipboardType,
   Download,
   Info,
@@ -49,6 +51,12 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
   const [hotkey, setHotkey] = useState<string>(DEFAULT_HOTKEY);
   const [enabled, setEnabled] = useState(false);
   const [accessibility, setAccessibility] = useState<boolean | null>(null);
+  // Banner is collapsed by default — only the warning row is visible.
+  // The user clicks the chevron / row to expand the full step-by-step
+  // walkthrough. The collapsed bar stays prominent (amber border +
+  // warning icon) so the problem remains obvious without taking the
+  // 8-line block of vertical real estate every settings visit.
+  const [accessExpanded, setAccessExpanded] = useState(false);
   // Set to true when polling detects a false→true transition. Drives the
   // "Access detected — restart ClipSnap to activate?" prompt: macOS caches
   // AXIsProcessTrusted per-process, so the running ClipSnap can't actually
@@ -258,47 +266,35 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-auto p-6">
-      {/* Accessibility banner — sits *above* the section card, sticky so
-          users always see action buttons when access is missing. Background
-          is solid (var(--color-bg)) so scrolling content can't bleed
-          through. */}
+      {/* Accessibility banner — collapsed by default to keep the
+          settings page scannable, but the warning row stays sticky
+          and amber-bordered so the problem is impossible to miss.
+          Click the row / chevron to expand the full walkthrough. */}
       {accessibility === false && (
         <div className="sticky top-[-24px] z-20 mx-auto -mt-2 mb-4 w-full max-w-2xl">
-          <div className="flex flex-col gap-3 rounded border border-amber-500/60 bg-[var(--color-bg)] px-3 py-2.5 text-[12px] text-[var(--color-text)] shadow-md ring-1 ring-amber-500/30">
-            <div className="flex items-start gap-2">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
-              <div className="flex-1">
-                <div className="font-medium">
+          <div className="rounded border border-amber-500/60 bg-[var(--color-bg)] text-[12px] text-[var(--color-text)] shadow-md ring-1 ring-amber-500/30">
+            {/* Always-visible warning row — clickable to toggle.
+                Shows the headline + the primary action so the user
+                can resolve the problem in one click without ever
+                expanding. */}
+            <div className="flex items-center gap-2 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setAccessExpanded((v) => !v)}
+                aria-expanded={accessExpanded}
+                aria-label={accessExpanded ? "Hide details" : "Show details"}
+                className="flex flex-1 items-center gap-2 text-left"
+              >
+                <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+                <span className="flex-1 font-medium">
                   Accessibility access required (macOS)
-                </div>
-                <div className="mt-0.5 text-[var(--color-muted)]">
-                  ClipSnap can't synthesize Cmd+Shift+← / Cmd+C / Cmd+V
-                  without it. This panel auto-detects when you flip the
-                  toggle in System Settings.
-                </div>
-                <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-[11px] text-[var(--color-muted)]">
-                  <li>Click <b>Open System Settings</b> below.</li>
-                  <li>Enable the <b>ClipSnap</b> toggle. (If it isn't in the list yet, click <b>+</b> and pick <code className="rounded bg-[var(--color-surface)] px-1">/Applications/ClipSnap.app</code>.)</li>
-                  <li>Switch back to ClipSnap. Within a second, this banner flips to a green <b>Restart now</b> prompt — one click, and you're done.</li>
-                </ol>
-                <details className="mt-2 text-[11px] text-[var(--color-muted)]">
-                  <summary className="cursor-pointer">Why does this keep happening on rebuild?</summary>
-                  <p className="mt-1">
-                    macOS Tahoe binds the Accessibility grant to the app's
-                    code-signature hash (<code>cdhash</code>). ClipSnap is
-                    ad-hoc-signed (no Apple Developer ID), so any binary
-                    change produces a new <code>cdhash</code> and macOS
-                    treats it as a new app. The{" "}
-                    <code>scripts/install-macos.sh</code> helper detects
-                    "binary unchanged" via SHA-256 and skips re-signing in
-                    that case, so a no-op rebuild keeps your grant. Real
-                    source changes still require a re-grant — the only
-                    permanent fix is an Apple Developer ID.
-                  </p>
-                </details>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 pl-6">
+                </span>
+                {accessExpanded ? (
+                  <ChevronUp size={14} className="shrink-0 text-[var(--color-muted)]" />
+                ) : (
+                  <ChevronDown size={14} className="shrink-0 text-[var(--color-muted)]" />
+                )}
+              </button>
               <button
                 onClick={async () => {
                   try {
@@ -311,65 +307,105 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
               >
                 Open System Settings
               </button>
-              <button
-                onClick={async () => {
-                  try {
-                    if (!window.confirm("Quit ClipSnap now? Re-launch it via Spotlight / Dock to pick up the new Accessibility grant.")) return;
-                    await quitApp();
-                  } catch (e) {
-                    setStatus({ kind: "err", message: String(e) });
-                  }
-                }}
-                className="rounded border border-amber-500/60 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
-              >
-                Quit ClipSnap
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    if (
-                      !window.confirm(
-                        "This wipes any stale Accessibility / PostEvent grants for ClipSnap and re-fires the macOS prompt with the current binary's signature. Use this when System Settings says ClipSnap is enabled but ClipSnap still asks for permission on every action. Continue?",
-                      )
-                    )
-                      return;
-                    await forceResetAndRequestGrant();
-                  } catch (e) {
-                    setStatus({ kind: "err", message: String(e) });
-                  }
-                }}
-                className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-                title="Runs `tccutil reset` for io.celox.clipsnap and re-fires the system permission prompt. Fixes the 'toggle is on but expansion still prompts' state."
-              >
-                Force re-grant (clear stale)
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await requestAccessibilityGrant();
-                  } catch (e) {
-                    setStatus({ kind: "err", message: String(e) });
-                  }
-                }}
-                className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-                title="Triggers macOS' built-in Accessibility prompt without resetting first. Use Force re-grant instead if the prompt fails to appear."
-              >
-                Try system prompt
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const ok = await getAccessibilityStatus();
-                    setAccessibility(ok);
-                  } catch (e) {
-                    setStatus({ kind: "err", message: String(e) });
-                  }
-                }}
-                className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-              >
-                Re-check
-              </button>
             </div>
+
+            {/* Expanded details — full step-by-step + every recovery
+                button. Hidden by default; revealed when the user clicks
+                the row above. */}
+            {accessExpanded && (
+              <div className="border-t border-amber-500/30 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <div className="w-3.5 shrink-0" aria-hidden />
+                  <div className="flex-1">
+                    <div className="text-[var(--color-muted)]">
+                      ClipSnap can't synthesize Cmd+Shift+← / Cmd+C / Cmd+V
+                      without it. This panel auto-detects when you flip the
+                      toggle in System Settings.
+                    </div>
+                    <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-[11px] text-[var(--color-muted)]">
+                      <li>Click <b>Open System Settings</b> above.</li>
+                      <li>Enable the <b>ClipSnap</b> toggle. (If it isn't in the list yet, click <b>+</b> and pick <code className="rounded bg-[var(--color-surface)] px-1">/Applications/ClipSnap.app</code>.)</li>
+                      <li>Switch back to ClipSnap. Within a second, this banner flips to a green <b>Restart now</b> prompt — one click, and you're done.</li>
+                    </ol>
+                    <details className="mt-2 text-[11px] text-[var(--color-muted)]">
+                      <summary className="cursor-pointer">Why does this keep happening on rebuild?</summary>
+                      <p className="mt-1">
+                        macOS Tahoe binds the Accessibility grant to the app's
+                        code-signature hash (<code>cdhash</code>). ClipSnap is
+                        ad-hoc-signed (no Apple Developer ID), so any binary
+                        change produces a new <code>cdhash</code> and macOS
+                        treats it as a new app. The{" "}
+                        <code>scripts/install-macos.sh</code> helper detects
+                        "binary unchanged" via SHA-256 and skips re-signing in
+                        that case, so a no-op rebuild keeps your grant. Real
+                        source changes still require a re-grant — the only
+                        permanent fix is an Apple Developer ID.
+                      </p>
+                    </details>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 pl-6">
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (!window.confirm("Quit ClipSnap now? Re-launch it via Spotlight / Dock to pick up the new Accessibility grant.")) return;
+                        await quitApp();
+                      } catch (e) {
+                        setStatus({ kind: "err", message: String(e) });
+                      }
+                    }}
+                    className="rounded border border-amber-500/60 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+                  >
+                    Quit ClipSnap
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (
+                          !window.confirm(
+                            "This wipes any stale Accessibility / PostEvent grants for ClipSnap and re-fires the macOS prompt with the current binary's signature. Use this when System Settings says ClipSnap is enabled but ClipSnap still asks for permission on every action. Continue?",
+                          )
+                        )
+                          return;
+                        await forceResetAndRequestGrant();
+                      } catch (e) {
+                        setStatus({ kind: "err", message: String(e) });
+                      }
+                    }}
+                    className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+                    title="Runs `tccutil reset` for io.celox.clipsnap and re-fires the system permission prompt. Fixes the 'toggle is on but expansion still prompts' state."
+                  >
+                    Force re-grant (clear stale)
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await requestAccessibilityGrant();
+                      } catch (e) {
+                        setStatus({ kind: "err", message: String(e) });
+                      }
+                    }}
+                    className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+                    title="Triggers macOS' built-in Accessibility prompt without resetting first. Use Force re-grant instead if the prompt fails to appear."
+                  >
+                    Try system prompt
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const ok = await getAccessibilityStatus();
+                        setAccessibility(ok);
+                      } catch (e) {
+                        setStatus({ kind: "err", message: String(e) });
+                      }
+                    }}
+                    className="rounded border border-[var(--color-border)] px-2.5 py-1 text-[11px] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+                  >
+                    Re-check
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

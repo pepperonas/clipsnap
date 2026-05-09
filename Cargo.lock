@@ -595,7 +595,7 @@ dependencies = [
 
 [[package]]
 name = "clipsnap-core"
-version = "0.10.5"
+version = "0.10.6"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "clipsnap-macos"
-version = "0.10.5"
+version = "0.10.6"
 dependencies = [
  "clipsnap-core",
  "tauri",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "clipsnap-win"
-version = "0.10.5"
+version = "0.10.6"
 dependencies = [
  "clipsnap-core",
  "tauri",

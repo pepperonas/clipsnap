@@ -4,6 +4,14 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.6] — 2026-05-09
+
+### Changed — Accessibility banner is now collapsible
+
+- **The Settings tab's Accessibility-required banner collapses to a single warning row by default.** When the macOS Accessibility permission is missing, the user sees a sticky amber-bordered bar with `⚠ Accessibility access required (macOS)` + the primary `Open System Settings` button + a chevron toggle. The full step-by-step walkthrough, the cdhash explanation, and the secondary buttons (Quit ClipSnap / Force re-grant / Try system prompt / Re-check) only appear when the chevron is expanded. — *#chore(ui)*
+- **Granted state is fully hidden** — when Accessibility is OK, no banner renders at all (previously the whole block was always present, which made the settings page feel cluttered for users who'd already granted). The `Restart now` prompt for the just-granted edge case still surfaces inside the Text-expander section as before.
+- The collapsed bar stays prominent (amber border + warning icon + primary action button visible at all times), so the problem state is impossible to miss while occupying just one row of vertical real estate. — *#fix(ui)*
+
 ## [0.10.5] — 2026-05-09
 
 ### Fixed — Modals overflowing the popup window
