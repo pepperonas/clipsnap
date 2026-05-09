@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { Bookmark, BookmarkCheck, Calculator, FileCode2, FileText, Files, Image, Palette, Trash2, Type, Zap } from "lucide-react";
 import type { ListEntry } from "../lib/types";
-import { relativeTime, truncateOneLine } from "../lib/format";
+import { formatAbsolute, relativeTime, truncateOneLine } from "../lib/format";
 
 interface Props {
   entry: ListEntry;
@@ -40,6 +40,11 @@ export const HistoryItem = memo(function HistoryItem({
   style,
 }: Props) {
   const [bookmarkSaved, setBookmarkSaved] = useState(false);
+  // Click on the relative-time chip toggles into the absolute date.
+  // Hover always shows both timestamps via the `title` tooltip
+  // regardless of toggle state — keeps the affordance discoverable
+  // without forcing the user to click first.
+  const [showAbsoluteTime, setShowAbsoluteTime] = useState(false);
   const isSnippet = entry.kind === "snippet";
   const isCalc = entry.kind === "calc";
   const isColor = entry.kind === "color";
@@ -85,14 +90,39 @@ export const HistoryItem = memo(function HistoryItem({
       color
     </span>
   ) : (
-    <span
-      className={
-        "shrink-0 text-[11px] " +
-        (selected ? "text-white/70" : "text-[var(--color-muted)]")
-      }
-    >
-      {relativeTime(entry.data.last_used_at)}
-    </span>
+    (() => {
+      const captured = formatAbsolute(entry.data.created_at);
+      const lastUsed = formatAbsolute(entry.data.last_used_at);
+      const sameInstant = entry.data.created_at === entry.data.last_used_at;
+      const tooltip = sameInstant
+        ? `Captured: ${captured}\n(never re-used since)`
+        : `Captured: ${captured}\nLast used: ${lastUsed}`;
+      const display = showAbsoluteTime
+        ? lastUsed
+        : relativeTime(entry.data.last_used_at);
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            // The row's onClick selects the entry; toggling the time
+            // shouldn't double-fire that. Stop propagation so a
+            // single click on the chip is just a chip-toggle.
+            e.stopPropagation();
+            setShowAbsoluteTime((v) => !v);
+          }}
+          title={tooltip}
+          className={
+            "shrink-0 cursor-pointer rounded text-[11px] tabular-nums " +
+            (selected
+              ? "text-white/70 hover:text-white"
+              : "text-[var(--color-muted)] hover:text-[var(--color-fg)]")
+          }
+          aria-label={tooltip.replace(/\n/g, " · ")}
+        >
+          {display}
+        </button>
+      );
+    })()
   );
 
   return (

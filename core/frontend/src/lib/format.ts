@@ -7,6 +7,21 @@ export function relativeTime(unixMs: number): string {
   return new Date(unixMs).toLocaleDateString();
 }
 
+/** Full local date+time string for absolute timestamps in tooltips
+ *  and click-to-reveal chips. Uses the user's locale via Intl —
+ *  on macOS that's whatever System Settings → Language & Region says,
+ *  matches Finder / mail / calendar formatting muscle memory. */
+export function formatAbsolute(unixMs: number): string {
+  return new Date(unixMs).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
