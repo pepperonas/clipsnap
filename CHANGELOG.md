@@ -4,6 +4,18 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-05-09
+
+### Added — Screen-region OCR (macOS)
+
+- **`Cmd+Shift+O` triggers an interactive screen-region picker.** Drag a marquee over any text on screen, ClipSnap runs Apple Vision OCR on the selection, writes the recognized text to the system clipboard, and pushes it into history. The source PNG is kept as a separate image entry so the user can re-OCR a different region without rescreenshotting. Tray menu also exposes an **OCR Region (⌘⇧O)** entry for discoverability. — *#feat(ocr)*
+  - **Region picker** ([`region_picker.rs`](./core/rust-lib/src/region_picker.rs)) shells out to `/usr/sbin/screencapture -i -x -t png`, the same binary backing Cmd+Shift+4 — battle-tested marquee UX (Esc cancels, Space drags the rect, etc.) without reinventing an `objc2` overlay window. Captured PNG read from a temp file then deleted.
+  - **OCR engine** ([`ocr.rs`](./core/rust-lib/src/ocr.rs)) uses Vision's `VNRecognizeTextRequest` (accuracy=Accurate, `usesLanguageCorrection=true`) via raw `objc2` `msg_send`. Joins one `\n` between observations (Vision returns one observation per visual line). Empty results are surfaced as `OcrResult { chars: 0 }` rather than an error so the UI can differentiate "engine ran but found nothing" from "engine failed".
+  - **Build** — new `core/rust-lib/build.rs` emits `cargo:rustc-link-lib=framework=Vision` on macOS so the framework is linked. No new crate dependencies.
+  - **IPC:** `ocr_region() -> { text, cancelled, chars }`. Both the global shortcut and the tray menu route through the shared `commands::run_ocr_pipeline(app)` helper, which dispatches the screencapture wait to a worker thread.
+  - **Watcher integration:** the OCR pipeline calls `mark_self_write` before writing, so the clipboard watcher doesn't double-capture the result as a fresh user copy.
+  - **Windows:** stubbed — both `region_picker::capture` and `ocr::recognize` return "not yet implemented on Windows" so the workspace still builds. Implementation will use `Windows.Media.Ocr` + a snipping overlay in a follow-up release.
+
 ## [0.8.0] — 2026-05-09
 
 ### Added — Image cutout / Freistellen

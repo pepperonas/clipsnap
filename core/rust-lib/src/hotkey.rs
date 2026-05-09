@@ -66,18 +66,48 @@ pub struct ExpanderShortcutState {
 
 /// Ctrl+Shift+V global hotkey for the popup.
 pub fn register(app: &AppHandle) -> Result<()> {
-    let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
-    let app_for_handler = app.clone();
-
+    let popup = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
+    let app_for_popup = app.clone();
     app.global_shortcut()
-        .on_shortcut(shortcut, move |_app, sc, event| {
-            if event.state == ShortcutState::Pressed && *sc == shortcut {
-                if let Err(e) = toggle_popup(&app_for_handler) {
+        .on_shortcut(popup, move |_app, sc, event| {
+            if event.state == ShortcutState::Pressed && *sc == popup {
+                if let Err(e) = toggle_popup(&app_for_popup) {
                     tracing::warn!("toggle_popup failed: {e:#}");
                 }
             }
         })
         .context("failed to register Ctrl+Shift+V")?;
+
+    // OCR region — Cmd/Ctrl+Shift+O. Hard-coded for now (configurable
+    // shortcut UI can come later); SUPER on macOS = Cmd, CONTROL
+    // elsewhere via the same Shortcut struct on each OS at compile time.
+    #[cfg(target_os = "macos")]
+    let ocr_mods = Modifiers::SUPER | Modifiers::SHIFT;
+    #[cfg(not(target_os = "macos"))]
+    let ocr_mods = Modifiers::CONTROL | Modifiers::SHIFT;
+    let ocr = Shortcut::new(Some(ocr_mods), Code::KeyO);
+    let app_for_ocr = app.clone();
+    app.global_shortcut()
+        .on_shortcut(ocr, move |_app, sc, event| {
+            if event.state == ShortcutState::Pressed && *sc == ocr {
+                // Dispatch to a worker — the screencapture wait blocks
+                // until the user finishes the marquee; doing it on the
+                // global-shortcut callback thread would hang the
+                // shortcut subsystem.
+                let app = app_for_ocr.clone();
+                std::thread::spawn(move || {
+                    match crate::commands::run_ocr_pipeline(&app) {
+                        Ok(r) if !r.cancelled && r.chars > 0 => {
+                            tracing::info!("OCR captured {} chars", r.chars);
+                        }
+                        Ok(_) => tracing::debug!("OCR cancelled or empty"),
+                        Err(e) => tracing::warn!("OCR pipeline: {e}"),
+                    }
+                });
+            }
+        })
+        .context("failed to register OCR hotkey")?;
+
     Ok(())
 }
 

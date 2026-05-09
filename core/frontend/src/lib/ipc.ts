@@ -329,3 +329,22 @@ export function imageChromaticity(id: number): Promise<number> {
 export function cutOutImageEntry(id: number): Promise<string> {
   return invoke("cut_out_image_entry", { id });
 }
+
+/** Result of an OCR run. `cancelled` distinguishes user-pressed-Esc
+ *  from "ran but no text detected". `chars` is the unicode character
+ *  count of the recognized text, included so toasts don't have to
+ *  recalculate. */
+export interface OcrResult {
+  text: string;
+  cancelled: boolean;
+  chars: number;
+}
+
+/** Trigger the OCR pipeline: hide popup → interactive region pick
+ *  (macOS `screencapture -i`) → OCR via Vision → write text to system
+ *  clipboard → also push as a History entry. macOS only for now;
+ *  Windows returns an error string. Blocks while the user is dragging
+ *  the marquee. */
+export function ocrRegion(): Promise<OcrResult> {
+  return invoke("ocr_region");
+}

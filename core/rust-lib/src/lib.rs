@@ -10,8 +10,10 @@ mod hotkey;
 mod models;
 mod notes;
 mod cutout;
+mod ocr;
 mod paste;
 mod recolor;
+mod region_picker;
 mod screen_picker;
 mod seed;
 mod settings;
@@ -209,6 +211,7 @@ pub fn run(context: tauri::Context<Wry>) {
             commands::recolor_image_entry,
             commands::image_chromaticity,
             commands::cut_out_image_entry,
+            commands::ocr_region,
         ])
         .run(context)
         .expect("error while running ClipSnap");
@@ -218,12 +221,19 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let open_item = MenuItemBuilder::with_id("open", "Open (Ctrl+Shift+V)").build(app)?;
     let snippets_item = MenuItemBuilder::with_id("snippets", "Manage Snippets").build(app)?;
     let notes_item = MenuItemBuilder::with_id("notes", "Manage Notes").build(app)?;
+    let ocr_label = if cfg!(target_os = "macos") {
+        "OCR Region (⌘⇧O)"
+    } else {
+        "OCR Region (Ctrl+Shift+O)"
+    };
+    let ocr_item = MenuItemBuilder::with_id("ocr", ocr_label).build(app)?;
     let pause_item = MenuItemBuilder::with_id("pause", "Pause Capture").build(app)?;
     let clear_item = MenuItemBuilder::with_id("clear", "Clear History…").build(app)?;
     let autostart_label = if cfg!(target_os = "windows") { "Start with Windows" } else { "Start at Login" };
     let autostart_item =
         MenuItemBuilder::with_id("autostart", autostart_label).build(app)?;
     let sep = PredefinedMenuItem::separator(app)?;
+    let sep_ocr = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItemBuilder::with_id("quit", "Quit ClipSnap").build(app)?;
 
@@ -232,6 +242,8 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             &open_item,
             &snippets_item,
             &notes_item,
+            &sep_ocr,
+            &ocr_item,
             &sep,
             &pause_item,
             &autostart_item,
@@ -262,6 +274,22 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                     tracing::warn!("show popup for notes: {e:#}");
                 }
                 let _ = app.emit("open-notes-tab", ());
+            }
+            "ocr" => {
+                // Same dispatch model as the global shortcut path:
+                // hand off to a worker thread so the menu callback
+                // returns immediately and the screencapture overlay
+                // doesn't fight the menu close animation.
+                let app2 = app.clone();
+                std::thread::spawn(move || {
+                    match commands::run_ocr_pipeline(&app2) {
+                        Ok(r) if !r.cancelled && r.chars > 0 => {
+                            tracing::info!("OCR (tray): {} chars", r.chars);
+                        }
+                        Ok(_) => tracing::debug!("OCR (tray): cancelled or empty"),
+                        Err(e) => tracing::warn!("OCR (tray) failed: {e}"),
+                    }
+                });
             }
             "pause" => {
                 if let Some(state) = app.try_state::<WatcherState>() {

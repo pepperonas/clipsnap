@@ -10,8 +10,10 @@ use crate::expander;
 use crate::hotkey::{self, ExpanderShortcutState};
 use crate::models::ClipEntry;
 use crate::notes::{self, Note};
+use crate::ocr;
 use crate::paste;
 use crate::recolor;
+use crate::region_picker;
 use crate::seed;
 use crate::settings;
 use crate::snippets::{self, ImportResult, Snippet};
@@ -828,6 +830,111 @@ pub fn image_chromaticity(
         .decode(entry.content_data.as_bytes())
         .map_err(|e| format!("base64 decode: {e}"))?;
     recolor::max_chromaticity_sample(&png_bytes, 4096).map_err(map_err)
+}
+
+/// Result returned to the frontend after an OCR run. `text` is empty
+/// when the user cancelled (`cancelled = true`) or when Vision found no
+/// text in the region — the UI uses the boolean to differentiate "user
+/// pressed Esc" from "no text detected" so a toast can be skipped in
+/// the cancel case.
+#[derive(serde::Serialize)]
+pub struct OcrResult {
+    pub text: String,
+    pub cancelled: bool,
+    /// Length in characters — handy for a frontend "Recognized 142
+    /// chars" toast without re-measuring on the JS side.
+    pub chars: usize,
+}
+
+/// Run the OCR pipeline: hide popup → interactive region capture →
+/// OCR → write to clipboard → add to history. Shared between the IPC
+/// command (tray "OCR region…", future button) and the global
+/// shortcut handler.
+///
+/// Blocks for the duration of the screencapture (user-driven) plus the
+/// Vision call (~50–500 ms depending on region size). Always invoke
+/// from a worker thread so the IPC handler thread / shortcut callback
+/// thread doesn't stall.
+pub fn run_ocr_pipeline(app: &AppHandle) -> Result<OcrResult, String> {
+    use base64::{engine::general_purpose::STANDARD as B64, Engine};
+    use clipboard_rs::{Clipboard, ClipboardContext};
+
+    // Hide the popup so the screencapture overlay shows over the
+    // *previously* focused window — same UX as Cmd+Shift+4.
+    hotkey::hide_popup(app);
+
+    let png_bytes = match region_picker::capture() {
+        Ok(b) => b,
+        Err(e) => {
+            // Distinguish "user cancelled" from a real error.
+            if e.downcast_ref::<region_picker::Cancelled>().is_some() {
+                return Ok(OcrResult { text: String::new(), cancelled: true, chars: 0 });
+            }
+            return Err(format!("region capture failed: {e:#}"));
+        }
+    };
+
+    let text = ocr::recognize(&png_bytes).map_err(|e| format!("ocr failed: {e:#}"))?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(OcrResult { text: String::new(), cancelled: false, chars: 0 });
+    }
+
+    // Write to system clipboard. Mark first so the watcher doesn't
+    // double-capture this as a fresh user-initiated copy.
+    if let Some(watcher) = app.try_state::<WatcherState>() {
+        watcher.mark_self_write(crate::models::ContentType::Text, trimmed);
+    }
+    let ctx = ClipboardContext::new()
+        .map_err(|e| format!("clipboard ctx init: {e:?}"))?;
+    ctx.set_text(trimmed.to_string())
+        .map_err(|e| format!("set_text: {e:?}"))?;
+
+    // Also persist the recognised text into history so the user can
+    // recall it from the popup later (full fuzzy-search reach).
+    if let Some(db) = app.try_state::<DbHandle>() {
+        let _ = db::upsert_clip(
+            &db,
+            &crate::models::NewClip {
+                content_type: crate::models::ContentType::Text,
+                content_text: trimmed.to_string(),
+                content_data: trimmed.to_string(),
+                byte_size: trimmed.len() as i64,
+            },
+        );
+    }
+    // Also keep the source PNG around as an image entry — useful when
+    // the OCR misread something and the user wants the original to
+    // re-OCR a different region or just paste the screenshot.
+    if let Some(db) = app.try_state::<DbHandle>() {
+        let b64 = B64.encode(&png_bytes);
+        let summary = format!("[ocr source · {} B]", png_bytes.len());
+        let byte_size = png_bytes.len() as i64;
+        let _ = db::upsert_clip(
+            &db,
+            &crate::models::NewClip {
+                content_type: crate::models::ContentType::Image,
+                content_text: summary,
+                content_data: b64,
+                byte_size,
+            },
+        );
+    }
+    let _ = app.emit("clipboard-changed", ());
+
+    let chars = trimmed.chars().count();
+    Ok(OcrResult { text: trimmed.to_string(), cancelled: false, chars })
+}
+
+/// IPC entry point — the menu / button caller. Dispatched to a thread
+/// so the screencapture wait doesn't block the IPC main thread.
+#[tauri::command]
+pub fn ocr_region(app: AppHandle) -> Result<OcrResult, String> {
+    // Run synchronously here. The Tauri IPC layer already gives us a
+    // worker thread, so wrapping in std::thread::spawn would just add
+    // hand-off overhead. Worst case the JS promise sits open for 5–30 s
+    // while the user drags the marquee.
+    run_ocr_pipeline(&app)
 }
 
 /// Background-remove an image entry via corner-sampled chroma-key, save

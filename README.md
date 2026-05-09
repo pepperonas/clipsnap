@@ -7,9 +7,9 @@
 
   **The keyboard-first clipboard toolkit for power users — Windows 11 & macOS**
 
-  Searchable history, system-wide snippets, inline calculator, color picker, image recolor + background removal — all behind one hotkey, all local, AES-256 encrypted at rest.
+  Searchable history, system-wide snippets, inline calculator, color picker, image recolor + background removal, screen-region OCR — all behind one hotkey, all local, AES-256 encrypted at rest.
 
-  [![Version](https://img.shields.io/badge/version-0.8.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
+  [![Version](https://img.shields.io/badge/version-0.9.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
   [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
   [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows11&logoColor=white)](./win)
   [![macOS](https://img.shields.io/badge/macOS-10.15+-000000?style=flat-square&logo=apple&logoColor=white)](./macos)
@@ -103,6 +103,15 @@ Type a math expression in the search field, the result appears as the top list i
 - **HSV picker modal** — hue slider, big swatch, output tabs for hex / RGB / HSL, two-click selection (no silent default), copy via Tauri clipboard plugin (sidesteps WKWebView restrictions).
 - **Pick from screen** — sample any pixel on the desktop. macOS: Apple's `NSColorSampler` magnifier loupe. Windows: fullscreen overlay + `GetPixel`. Module: [`screen_picker.rs`](./core/rust-lib/src/screen_picker.rs).
 - Frontend in [`colors.ts`](./core/frontend/src/lib/colors.ts) + [`ColorPickerModal.tsx`](./core/frontend/src/components/ColorPickerModal.tsx). 24 tests. Reference: [`docs/colors.md`](./docs/colors.md).
+
+### Screen-region OCR (v0.9.0, macOS)
+Press `Cmd+Shift+O` (or use the tray's **OCR Region** entry) → drag a marquee over any text on screen → ClipSnap runs Apple Vision over the selection and writes the recognized text straight to your clipboard. The text also lands in the History tab and the source PNG is kept as a separate image entry so you can re-OCR a different region without rescreenshotting.
+
+- **Region picker** — uses `screencapture -i` (the same binary as Cmd+Shift+4), so the marquee UX is the polished one users already know. Esc cancels cleanly.
+- **Engine** — Vision's `VNRecognizeTextRequest` with accuracy=Accurate + language correction; same engine that powers Apple Live Text. No model bundling, no network.
+- **Languages** — whatever your macOS Vision install supports (Latin + CJK + Arabic + Cyrillic on macOS 13+).
+- **Windows** — implementation pending (will use `Windows.Media.Ocr`).
+- Modules: [`region_picker.rs`](./core/rust-lib/src/region_picker.rs), [`ocr.rs`](./core/rust-lib/src/ocr.rs).
 
 ### Image tools — recolor + cutout (v0.7.0)
 On selected image entries, the preview pane exposes two actions:
