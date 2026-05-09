@@ -16,7 +16,7 @@ export function Footer({ index, total, version }: Props) {
         <Hint k="Esc" label="Close" />
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline" title="Made with love by Martin Pfeffer">
+        <span title="Made with love by Martin Pfeffer">
           made with <span className="text-red-400">♥</span> by Martin Pfeffer
         </span>
         {version && (
