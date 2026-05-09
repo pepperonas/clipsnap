@@ -42,9 +42,15 @@ export function AboutModal({ open, onClose, version }: Props) {
       }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
     >
-      <div className="w-[420px] max-w-[92vw] rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4 shadow-2xl">
-        {/* Header */}
-        <div className="mb-3 flex items-center justify-between">
+      {/* Three-row flex grid (header / scrollable body / footer) so
+          a popup window shorter than the modal's natural height
+          (~700 px on small displays / the 500-px-tall ClipSnap
+          popup) renders sticky chrome with the body scrolling
+          inside. `max-h-[calc(100vh-2rem)]` keeps the rounded
+          corners visible by leaving 1 rem breathing room top + bottom. */}
+      <div className="flex max-h-[calc(100vh-2rem)] w-[420px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] shadow-2xl">
+        {/* Header — sticky at top of the modal, never scrolls away. */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
           <h2 className="flex items-center gap-2 text-[14px] font-semibold">
             <Info size={14} className="text-[var(--color-accent)]" />
             About ClipSnap
@@ -58,61 +64,66 @@ export function AboutModal({ open, onClose, version }: Props) {
           </button>
         </div>
 
-        {/* Identity block */}
-        <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-[12px]">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[14px] font-semibold">ClipSnap</span>
-            {version && (
-              <span className="font-[var(--font-mono)] text-[12px] text-[var(--color-muted)]">
-                v{version}
-              </span>
-            )}
+        {/* Scrollable body. min-h-0 + flex-1 + overflow-y-auto is the
+            React/Tailwind incantation for "fill remaining space and
+            scroll inside instead of pushing the parent". */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {/* Identity block */}
+          <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-[12px]">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[14px] font-semibold">ClipSnap</span>
+              {version && (
+                <span className="font-[var(--font-mono)] text-[12px] text-[var(--color-muted)]">
+                  v{version}
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] leading-snug text-[var(--color-muted)]">
+              Clipboard productivity toolkit for power users — searchable
+              history, snippets, calculator, color picker, image tools.
+            </div>
           </div>
-          <div className="mt-0.5 text-[11px] leading-snug text-[var(--color-muted)]">
-            Clipboard productivity toolkit for power users — searchable
-            history, snippets, calculator, color picker, image tools.
-          </div>
-        </div>
 
-        {/* Meta table */}
-        <table className="mb-3 w-full text-[12px]">
-          <tbody>
-            <Meta label="Developer" value="Martin Pfeffer" />
-            <Meta label="License" value="MIT" />
-            <Meta label="Year" value="2026" />
-            <Meta label="Audience" value="Keyboard-driven power users" />
-          </tbody>
-        </table>
-
-        {/* Workflow pitch */}
-        <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-[11px] leading-relaxed">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
-            Workflow optimization
-          </div>
-          One hotkey, no mouse. Search clipboard history fuzzy, expand
-          snippets system-wide, calculate inline, sample colors, recolor
-          and freistellen images — without leaving the keyboard. Local
-          SQLite, AES-256 encrypted at rest, no telemetry, no cloud.
-        </div>
-
-        {/* Tech-stack mini table */}
-        <div className="mb-3">
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-            Tech stack
-          </div>
-          <table className="w-full text-[11px]">
+          {/* Meta table */}
+          <table className="mb-3 w-full text-[12px]">
             <tbody>
-              <Tech label="Shell" value="Tauri 2 · Wry / WebView" />
-              <Tech label="Backend" value="Rust (stable) · rusqlite · clipboard-rs · enigo" />
-              <Tech label="Storage" value="SQLite · AES-256-GCM · OS keychain" />
-              <Tech label="Frontend" value="React 19 · TypeScript 5 · Vite 7 · Tailwind v4" />
-              <Tech label="Image" value="image 0.25 (PNG only)" />
+              <Meta label="Developer" value="Martin Pfeffer" />
+              <Meta label="License" value="MIT" />
+              <Meta label="Year" value="2026" />
+              <Meta label="Audience" value="Keyboard-driven power users" />
             </tbody>
           </table>
+
+          {/* Workflow pitch */}
+          <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-[11px] leading-relaxed">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+              Workflow optimization
+            </div>
+            One hotkey, no mouse. Search clipboard history fuzzy, expand
+            snippets system-wide, calculate inline, sample colors, recolor
+            and freistellen images — without leaving the keyboard. Local
+            SQLite, AES-256 encrypted at rest, no telemetry, no cloud.
+          </div>
+
+          {/* Tech-stack mini table */}
+          <div>
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              Tech stack
+            </div>
+            <table className="w-full text-[11px]">
+              <tbody>
+                <Tech label="Shell" value="Tauri 2 · Wry / WebView" />
+                <Tech label="Backend" value="Rust (stable) · rusqlite · clipboard-rs · enigo" />
+                <Tech label="Storage" value="SQLite · AES-256-GCM · OS keychain" />
+                <Tech label="Frontend" value="React 19 · TypeScript 5 · Vite 7 · Tailwind v4" />
+                <Tech label="Image" value="image 0.25 (PNG only)" />
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between text-[11px] text-[var(--color-muted)]">
+        {/* Footer — sticky at the bottom, like the header. */}
+        <div className="flex shrink-0 items-center justify-between border-t border-[var(--color-border)] px-4 py-2.5 text-[11px] text-[var(--color-muted)]">
           <a
             href="https://github.com/pepperonas/clipsnap"
             target="_blank"

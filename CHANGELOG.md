@@ -4,6 +4,13 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5] — 2026-05-09
+
+### Fixed — Modals overflowing the popup window
+
+- **About dialog** is now bounded to `max-h-[calc(100vh-2rem)]` and uses a three-row layout (sticky header / scrollable body / sticky footer). The natural height (~700 px) exceeded the 500-px-tall popup on the previous release, which clipped both the rounded top corners and the bottom credit line off-screen. The body now scrolls inside the modal, both sticky sections stay visible, the rounded `rounded-xl` corners are guaranteed visible. — *#fix(ui)*
+- **Color picker dialog** gets the same `max-h-[calc(100vh-2rem)] overflow-y-auto` safety net so its rounded corners survive on small popup heights too. The picker is more compact (~450 px) so scrolling rarely triggers, but the constraint costs nothing and matches the About-dialog treatment.
+
 ## [0.10.4] — 2026-05-09
 
 ### Changed — UI consistency pass on modals
