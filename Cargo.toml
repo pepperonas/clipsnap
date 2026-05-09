@@ -3,7 +3,7 @@ resolver = "2"
 members = ["core/rust-lib", "win/src-tauri", "macos/src-tauri"]
 
 [workspace.package]
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 authors = ["Martin Pfeffer <martinpaush@gmail.com>"]
 license = "MIT"
@@ -46,6 +46,14 @@ dirs = "5"
 image = { version = "0.25", default-features = false, features = [
     "png", "jpeg", "webp", "gif", "bmp",
 ] }
+# ONNX Runtime FFI for the ML-based subject cutout. We tried tract
+# (pure Rust) first but it can't run U2Net's Resize ops cleanly —
+# pytorch_half_pixel isn't supported, and naive substitution produces
+# the wrong output dimensions. ort statically links the runtime via
+# the `download-binaries` feature, so users don't need anything
+# pre-installed. ndarray is used to build the input tensor.
+ort = { version = "2.0.0-rc.12", features = ["ndarray"] }
+ndarray = "0.17"
 
 # Observability / errors / concurrency
 anyhow = "1"

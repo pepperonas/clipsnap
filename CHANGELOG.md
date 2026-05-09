@@ -4,6 +4,18 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-05-09
+
+### Changed — Cutout switched from chroma-key to ML
+
+- **U2Netp ONNX model now drives the cutout pipeline** (`cutout_ml.rs`). Cross-platform via the `ort` crate (ONNX Runtime, statically linked). Same architecture as Python's `rembg`, no Python dependency. — *#feat(cutout)*
+  - **Why the switch.** The v0.8.0 chroma-key approach (corner-sampled background colour) only worked on truly uniform backgrounds. Real photos — airplane in gradient sky, person against cluttered background, anything where subject and background share colours — produced cutouts that left most of the background intact. Subject segmentation is the right tool; chroma-key is the wrong one.
+  - **Pipeline:** decode any input format (PNG / JPEG / WebP / GIF / BMP) → resize to 320×320 → ImageNet-normalise → run U2Netp inference → resize the resulting saliency mask back to the original dimensions → apply as alpha on the original RGB → encode as PNG. ~1–4 s on CPU for a typical-size photo.
+  - **Bundled artifacts:** [`core/rust-lib/models/u2netp.onnx`](./core/rust-lib/models/u2netp.onnx) (4.5 MB, Apache-2.0). The ONNX Runtime native library is statically linked via `ort`'s `download-binaries` feature, growing the release binary from ~12 MB to ~40 MB.
+  - **Deps added:** `ort = "2.0.0-rc.12"` + `ndarray = "0.17"` (workspace); pulled into `core/rust-lib`. We tried `tract-onnx` first (pure Rust, no FFI) but it can't run U2Net's `Resize` ops with `pytorch_half_pixel` correctly; ort handles them natively.
+  - **Old chroma-key code** in `cutout.rs` is kept around (marked `#![allow(dead_code)]`) as a future fast-path for known-uniform-background inputs.
+  - **Tests:** 3 unit tests in `cutout_ml::tests` cover the smoke path (synthetic input → valid PNG out), oversize rejection, and corrupt-input rejection.
+
 ## [0.9.0] — 2026-05-09
 
 ### Added — Screen-region OCR (macOS)

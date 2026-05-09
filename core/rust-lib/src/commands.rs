@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::backup::{self, BackupImportResult};
 use crate::clipboard_watcher::WatcherState;
-use crate::cutout;
+use crate::cutout_ml;
 use crate::db::{self, DbHandle};
 use crate::expander;
 use crate::hotkey::{self, ExpanderShortcutState};
@@ -984,10 +984,16 @@ pub fn cut_out_image_file(path: String) -> Result<String, String> {
 /// Internal helper: run cutout, write to ~/Downloads, return the saved
 /// path. `name_hint` becomes the filename prefix when present, falling
 /// back to the timestamp-only name when absent.
+///
+/// Uses the ML pipeline (`cutout_ml`) — real subject segmentation via
+/// the embedded U2Netp ONNX model. The chroma-key implementation in
+/// `cutout.rs` is kept around for future use (e.g. as a fast-path for
+/// known-uniform-background entries) but no longer wired by default
+/// because it failed too noisily on real photos.
 fn write_cutout(image_bytes: &[u8], name_hint: Option<&str>) -> Result<String, String> {
     use chrono::Local;
 
-    let result = cutout::cut_out_background(image_bytes).map_err(map_err)?;
+    let png_bytes = cutout_ml::cut_out_subject(image_bytes).map_err(map_err)?;
 
     // ~/Downloads is the agreed output location. Falls back to the
     // home directory only if Downloads doesn't resolve (very unusual on
@@ -1003,7 +1009,7 @@ fn write_cutout(image_bytes: &[u8], name_hint: Option<&str>) -> Result<String, S
         _ => format!("clipsnap-cutout-{stamp}.png"),
     };
     let out_path = dir.join(&filename);
-    std::fs::write(&out_path, &result.png).map_err(|e| format!("write {filename}: {e}"))?;
+    std::fs::write(&out_path, &png_bytes).map_err(|e| format!("write {filename}: {e}"))?;
 
     Ok(out_path.to_string_lossy().into_owned())
 }

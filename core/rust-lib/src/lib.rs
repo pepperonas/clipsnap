@@ -10,6 +10,7 @@ mod hotkey;
 mod models;
 mod notes;
 mod cutout;
+mod cutout_ml;
 mod ocr;
 mod paste;
 mod recolor;

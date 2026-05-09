@@ -1,3 +1,8 @@
+// Currently unused since v0.10.0 switched to the ML pipeline in
+// `cutout_ml.rs`. Kept around as a fast-path fallback for cases where
+// the embedded U2Netp model is overkill (true uniform backgrounds).
+#![allow(dead_code)]
+
 //! Background removal for clipboard / file images ("Freistellen").
 //!
 //! Strategy: chroma-key the four corner regions. We assume the corners

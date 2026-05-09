@@ -9,7 +9,7 @@
 
   Searchable history, system-wide snippets, inline calculator, color picker, image recolor + background removal, screen-region OCR — all behind one hotkey, all local, AES-256 encrypted at rest.
 
-  [![Version](https://img.shields.io/badge/version-0.9.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
+  [![Version](https://img.shields.io/badge/version-0.10.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
   [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
   [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows11&logoColor=white)](./win)
   [![macOS](https://img.shields.io/badge/macOS-10.15+-000000?style=flat-square&logo=apple&logoColor=white)](./macos)
@@ -113,12 +113,13 @@ Press `Cmd+Shift+O` (or use the tray's **OCR Region** entry) → drag a marquee 
 - **Windows** — implementation pending (will use `Windows.Media.Ocr`).
 - Modules: [`region_picker.rs`](./core/rust-lib/src/region_picker.rs), [`ocr.rs`](./core/rust-lib/src/ocr.rs).
 
-### Image tools — recolor + cutout (v0.7.0)
+### Image tools — recolor + ML cutout (v0.7.0 → v0.10.0)
 On selected image entries, the preview pane exposes two actions:
 
-- **Recolor** — for mostly-grayscale PNGs (logos / icons / silhouettes), 9 preset swatches + custom hex tint the image. RGB lerps from target → white by per-pixel luminance, alpha preserved. Saturated photos are auto-hidden from the toolbar (chromaticity gate). Adds the tinted version as a new history entry; original stays.
-- **Cut out background** — chroma-keys the image using the four corner colours. Output saved to `~/Downloads/clipsnap-cutout-<ts>.png`. Shortcut `Cmd/Ctrl+B`. Works cleanly on uniform backgrounds (sky, studio); complex / cluttered backgrounds need ML which is out of scope.
-- Modules: [`recolor.rs`](./core/rust-lib/src/recolor.rs), [`cutout.rs`](./core/rust-lib/src/cutout.rs). 11 tests combined. 16 MP cap to keep latency bounded on the UI thread.
+- **Recolor** (v0.7.0) — for mostly-grayscale PNGs (logos / icons / silhouettes), 9 preset swatches + custom hex tint the image. RGB lerps from target → white by per-pixel luminance, alpha preserved. Saturated photos are auto-hidden from the toolbar (chromaticity gate). Adds the tinted version as a new history entry; original stays.
+- **Cut out background** (v0.10.0) — runs the **U2Netp ONNX model** (~4.5 MB embedded) over the image to detect the foreground subject; output is a transparent PNG saved to `~/Downloads/<name>-cutout-<ts>.png`. Shortcut `Cmd/Ctrl+B`. Works on real photos (airplane in sky, person against cluttered background, …) — same architecture as Python's `rembg`, just without Python. Inference runs via `ort` (ONNX Runtime, statically linked).
+- **Inputs:** PNG, JPEG, WebP, GIF, BMP — for clipboard image entries *and* single-file Files entries (so a JPG copied from Finder works too). Output is always RGBA PNG.
+- Modules: [`recolor.rs`](./core/rust-lib/src/recolor.rs), [`cutout_ml.rs`](./core/rust-lib/src/cutout_ml.rs). 16 MP cap on inputs.
 
 ### Notes (v0.2.6)
 Persistent, categorized clipboard items in a separate SQLite table — **not** subject to the 1 000-entry pruning.

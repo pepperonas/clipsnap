@@ -121,14 +121,19 @@ Triggered by `Cmd/Ctrl+Shift+O` (registered alongside the popup hotkey in `hotke
 - **OCR** (macOS) uses Vision via raw `objc2` msg_send: `NSData::dataWithBytes:length:` → `VNImageRequestHandler.alloc().initWithData:options:` → `VNRecognizeTextRequest` (recognitionLevel=0/Accurate, usesLanguageCorrection=true) → `performRequests:error:` synchronously → enumerate `request.results` taking `topCandidates(1).string`. Vision is linked explicitly via `core/rust-lib/build.rs` (`cargo:rustc-link-lib=framework=Vision`).
 - **Output**: text written to system clipboard (with `WatcherState::mark_self_write` so the watcher doesn't recapture it), plus two history entries — the recognised text and the source PNG. Returns `OcrResult { text, cancelled, chars }` so the frontend can show "recognised N chars" toasts.
 
-### Image tools (`recolor.rs`, `cutout.rs`)
+### Image tools (`recolor.rs`, `cutout_ml.rs`)
 
-Two image actions surface in the preview pane when an image entry is selected:
+Two image actions surface in the preview pane:
 
-- **Recolor** (`recolor.rs`) — `image::load_from_memory_with_format(Png)` → for each RGBA pixel, replace RGB with `lerp(target, white, luminance)` (alpha untouched) → re-encode → `db::upsert_clip` as a new history row. Eligibility gate: `image_chromaticity` samples up to 4096 opaque pixels (`max((max-min)/max)`). Toolbar only shown when chromaticity < 0.12, i.e. logos / silhouettes.
-- **Cut-out background** (`cutout.rs`) — chroma-key. Sample 8×8 patches at all four corners, take the per-channel median as the background colour, walk every pixel: distance ≤ 30 RGB units → `alpha = 0`, ≥ 50 → keep original alpha, between → linear feather. Output written to `~/Downloads/clipsnap-cutout-<ts>.png`. Triggered by button in PreviewPanel or `Cmd/Ctrl+B` shortcut.
+- **Recolor** (`recolor.rs`) — `image::load_from_memory` → for each RGBA pixel, replace RGB with `lerp(target, white, luminance)` (alpha untouched) → re-encode → `db::upsert_clip` as a new history row. Eligibility gate: `image_chromaticity` samples up to 4096 opaque pixels (`max((max-min)/max)`). Toolbar only shown when chromaticity < 0.12 (logos / silhouettes).
+- **Cut-out background** (`cutout_ml.rs`) — runs U2Netp via the `ort` crate (ONNX Runtime). Decode → resize to 320×320 → ImageNet-normalise (mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`) → inference → resize mask back → apply as alpha on the original RGB → encode PNG. Output to `~/Downloads/<name>-cutout-<ts>.png`. Triggered by button in PreviewPanel or `Cmd/Ctrl+B`. Works on real photos (subject/background colour overlap is no longer fatal).
+  - Model file: `core/rust-lib/models/u2netp.onnx` (~4.5 MB, embedded via `include_bytes!`).
+  - ONNX Runtime is statically linked via `ort`'s `download-binaries` feature → release binary ~40 MB.
+  - Session is held in `OnceLock<Mutex<Session>>` so the first cutout pays the model-load cost (~150 ms) once and subsequent calls reuse it.
+- **Cutout source variants** — IPC has both `cut_out_image_entry(id)` (clipboard image rows) and `cut_out_image_file(path)` (single-file Files entries pointing at PNG/JPG/WebP/GIF/BMP). Same `cutout_ml::cut_out_subject` underneath via `commands::write_cutout`.
+- The legacy chroma-key (`cutout.rs`) stays in the tree under `#![allow(dead_code)]` as a future fast-path for true-uniform-background images.
 
-Both modules share the 16 MP hard cap and the same `image` 0.25 dependency (PNG-only feature set).
+Both modules share the 16 MP hard cap and the multi-format `image` 0.25 dependency (PNG / JPEG / WebP / GIF / BMP).
 
 ### Clipboard capture priority
 
