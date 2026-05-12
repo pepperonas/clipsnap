@@ -153,26 +153,54 @@ pub fn register_expander(
     let app_for_handler = app.clone();
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, sc, event| {
-            if event.state == ShortcutState::Pressed && *sc == shortcut {
-                // CRITICAL: enigo's `Key::Unicode(...)` mapping calls the
-                // macOS TSM (Text Services Manager) APIs, which assert
-                // they're called on the main thread. Calling them from a
-                // worker thread — as we used to with `std::thread::spawn`
-                // — fires `_dispatch_assert_queue_fail` and crashes the
-                // process with EXC_BREAKPOINT/SIGTRAP. Dispatch the whole
-                // cycle to the main thread instead. ~290 ms blocking is
-                // acceptable here: the popup is hidden during the cycle,
-                // so the freeze is invisible to the user.
-                let app = app_for_handler.clone();
-                let app_in_closure = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    if let Some(db) = app_in_closure.try_state::<DbHandle>() {
-                        if let Err(e) = expander::expand_at_cursor(&db) {
-                            tracing::warn!("expand_at_cursor failed: {e:#}");
-                        }
-                    }
-                });
+            if event.state != ShortcutState::Pressed || *sc != shortcut {
+                return;
             }
+            let app = app_for_handler.clone();
+
+            // Bail *loudly* when synthetic input isn't available (macOS
+            // Accessibility). Without this the whole expand cycle silently
+            // no-ops — enigo's keystrokes never reach the source app — and
+            // the user concludes the hotkey is dead. Pop the popup + emit
+            // an event the frontend turns into a "grant Accessibility"
+            // banner. Mirrors the OCR `screen.permission_denied` path.
+            // `accessibility_granted()` is a cheap, thread-safe CF call.
+            // (Always `true` on Windows/Linux, so this never blocks there.)
+            if !expander::accessibility_granted() {
+                tracing::warn!(
+                    "expander hotkey pressed but Accessibility not granted — \
+                     showing permission banner instead of running the cycle"
+                );
+                let _ = show_popup(&app);
+                let _ = app.emit("expander-permission-needed", ());
+                return;
+            }
+
+            // CRITICAL: enigo's `Key::Unicode(...)` mapping calls the
+            // macOS TSM (Text Services Manager) APIs, which assert
+            // they're called on the main thread. Calling them from a
+            // worker thread — as we used to with `std::thread::spawn`
+            // — fires `_dispatch_assert_queue_fail` and crashes the
+            // process with EXC_BREAKPOINT/SIGTRAP. Dispatch the whole
+            // cycle to the main thread instead. ~330 ms blocking is
+            // acceptable here: the popup is hidden during the cycle,
+            // so the freeze is invisible to the user.
+            let app_in_closure = app.clone();
+            let app_for_err = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Some(db) = app_in_closure.try_state::<DbHandle>() {
+                    match expander::expand_at_cursor(&db) {
+                        Ok(()) => {}
+                        Err(e) if e.to_string() == expander::ERR_NO_ACCESSIBILITY => {
+                            // Grant revoked between the check above and
+                            // here (rare). Same actionable UX.
+                            let _ = show_popup(&app_for_err);
+                            let _ = app_for_err.emit("expander-permission-needed", ());
+                        }
+                        Err(e) => tracing::warn!("expand_at_cursor failed: {e:#}"),
+                    }
+                }
+            });
         })
         .with_context(|| format!("failed to register expander hotkey {hotkey:?}"))?;
 

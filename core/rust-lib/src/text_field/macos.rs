@@ -11,7 +11,7 @@
 use anyhow::{anyhow, Result};
 use std::ffi::{c_void, CString};
 
-use super::{trim_word, word_start_before_cursor, FieldAccess};
+use super::{trim_word, word_start_before_cursor, FieldAccess, ReplaceOutcome};
 
 // ── Core Foundation FFI ─────────────────────────────────────────────────────
 
@@ -222,9 +222,9 @@ impl FieldAccess for AxFieldAccess {
         Ok(Some(word))
     }
 
-    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<bool> {
+    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<ReplaceOutcome> {
         let Some((focused, value, cursor_chars)) = self.read_focused()? else {
-            return Ok(false);
+            return Ok(ReplaceOutcome::Unsupported);
         };
         let start_byte = word_start_before_cursor(&value, cursor_chars);
         // The cursor in *char* index → byte index.
@@ -233,6 +233,11 @@ impl FieldAccess for AxFieldAccess {
             .nth(cursor_chars)
             .map(|(i, _)| i)
             .unwrap_or(value.len());
+        if start_byte >= cursor_byte {
+            // Nothing before the cursor — nothing to replace.
+            unsafe { CFRelease(focused) };
+            return Ok(ReplaceOutcome::Unsupported);
+        }
 
         // Compute the word range as UTF-16 code units (which is what AX
         // expects when we set the selected range).
@@ -242,13 +247,16 @@ impl FieldAccess for AxFieldAccess {
         let length_utf16: isize = utf16_count(word) as isize;
 
         unsafe {
-            // 1) Set kAXSelectedTextRangeAttribute to (start, length) of the word.
+            // 1) Set kAXSelectedTextRangeAttribute to (start, length) of
+            //    the word — this *selects* the abbreviation. If even this
+            //    fails the element exposes no settable text attributes;
+            //    let the caller do the full keystroke fallback.
             let range = (start_utf16, length_utf16);
             let range_value =
                 AXValueCreate(KAX_VALUE_CFRANGE_TYPE, &range as *const _ as *const c_void);
             if range_value.is_null() {
                 CFRelease(focused);
-                return Ok(false);
+                return Ok(ReplaceOutcome::Unsupported);
             }
             let attr_range = cf_string("AXSelectedTextRange");
             let err = AXUIElementSetAttributeValue(focused, attr_range, range_value);
@@ -256,11 +264,15 @@ impl FieldAccess for AxFieldAccess {
             CFRelease(range_value);
             if err != KAX_ERROR_SUCCESS {
                 CFRelease(focused);
-                return Ok(false);
+                return Ok(ReplaceOutcome::Unsupported);
             }
 
             // 2) Set kAXSelectedTextAttribute to the replacement string.
-            //    macOS replaces the range with the new text.
+            //    On a well-behaved Cocoa text view this replaces the
+            //    selected range in place. On Electron / Chromium /
+            //    Mac-Catalyst text views it commonly returns
+            //    kAXErrorSuccess but does nothing — so we don't trust the
+            //    return code; we verify by re-reading AXValue below.
             let attr_seltext = cf_string("AXSelectedText");
             let replacement_cf = {
                 let c = CString::new(replacement.replace('\0', "")).unwrap();
@@ -269,14 +281,36 @@ impl FieldAccess for AxFieldAccess {
             if replacement_cf.is_null() {
                 CFRelease(attr_seltext);
                 CFRelease(focused);
-                return Ok(false);
+                // The range was set in step 1 → the abbreviation is
+                // selected → caller can paste over it.
+                return Ok(ReplaceOutcome::SelectionActive);
             }
-            let err = AXUIElementSetAttributeValue(focused, attr_seltext, replacement_cf);
+            let _ = AXUIElementSetAttributeValue(focused, attr_seltext, replacement_cf);
             CFRelease(attr_seltext);
             CFRelease(replacement_cf);
+
+            // 3) Verify. Give the app a beat, then re-read AXValue. If the
+            //    field's text actually changed, the in-place replace took.
+            //    If not, the word is still selected from step 1 — tell the
+            //    caller to paste over the selection.
+            std::thread::sleep(std::time::Duration::from_millis(15));
+            let attr_value = cf_string("AXValue");
+            let mut new_value_cf: CFTypeRef = std::ptr::null();
+            let verr = AXUIElementCopyAttributeValue(focused, attr_value, &mut new_value_cf);
+            CFRelease(attr_value);
+            let new_value = if verr == KAX_ERROR_SUCCESS && !new_value_cf.is_null() {
+                let s = cf_string_to_rust(new_value_cf);
+                CFRelease(new_value_cf);
+                s
+            } else {
+                None
+            };
             CFRelease(focused);
 
-            Ok(err == KAX_ERROR_SUCCESS)
+            match new_value {
+                Some(nv) if nv != value => Ok(ReplaceOutcome::Replaced),
+                _ => Ok(ReplaceOutcome::SelectionActive),
+            }
         }
     }
 }

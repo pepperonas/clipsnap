@@ -34,7 +34,7 @@ use windows::Win32::UI::Accessibility::{
     CUIAutomation, IUIAutomation, IUIAutomationTextPattern, TextUnit_Word, UIA_TextPatternId,
 };
 
-use super::{trim_word, FieldAccess};
+use super::{trim_word, FieldAccess, ReplaceOutcome};
 
 pub struct UiaFieldAccess;
 
@@ -124,13 +124,18 @@ impl FieldAccess for UiaFieldAccess {
         self.read_word()
     }
 
-    /// Windows replace: Backspace × char_count(word) + type the body.
-    /// The caller is responsible for hiding the popup beforehand so the
-    /// keystrokes land in the previously focused app, not in ClipSnap.
-    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<bool> {
+    /// Windows replace: Backspace × char_count(word) + type the body via
+    /// `SendInput`. The caller hides the popup beforehand so the keystrokes
+    /// land in the previously focused app, not in ClipSnap.
+    ///
+    /// Returns `Unsupported` only when the focused element exposes no UIA
+    /// TextPattern at all (caller does the keystroke-select fallback);
+    /// otherwise `Replaced` — `SendInput` on Windows has none of the
+    /// macOS reliability caveats, so the Backspace+type path is trusted.
+    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<ReplaceOutcome> {
         let word = match self.read_word()? {
             Some(w) => w,
-            None => return Ok(false),
+            None => return Ok(ReplaceOutcome::Unsupported),
         };
         let backspaces = word.chars().count();
 
@@ -151,6 +156,6 @@ impl FieldAccess for UiaFieldAccess {
         }
         e.text(replacement)
             .map_err(|err| anyhow!("type body: {err:?}"))?;
-        Ok(true)
+        Ok(ReplaceOutcome::Replaced)
     }
 }

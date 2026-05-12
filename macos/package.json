@@ -1,7 +1,7 @@
 {
   "name": "clipsnap-macos",
   "private": true,
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "ClipSnap — macOS bundle shell (Tauri CLI entry + frontend proxy scripts)",
   "scripts": {
     "tauri": "tauri",

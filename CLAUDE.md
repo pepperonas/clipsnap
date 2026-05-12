@@ -102,6 +102,8 @@ Assembly order in `App.tsx`: calc result first → snippet matches → fuzzy cli
 | `"window-shown"` | Resets to history tab + focuses search on hotkey press |
 | `"open-snippets-tab"` | Tray "Manage Snippets" → switches tab |
 | `"open-notes-tab"` | Tray "Manage Notes" → switches tab |
+| `"ocr-permission-needed"` | OCR hotkey pressed but Screen Recording not granted → frontend banner + Settings tab |
+| `"expander-permission-needed"` | Expander hotkey pressed but Accessibility not granted → frontend banner + Settings tab |
 
 ### Text expander (`expander.rs`)
 
@@ -109,9 +111,15 @@ Two separate expansion modes exist:
 
 1. **Search-based** (always on): type an abbreviation in the search field → matching snippets appear at top of list → Enter pastes. Handled entirely in the frontend via `findSnippets()`.
 
-2. **Hotkey-based** (`expander.rs`, default hotkey `Alt+Backquote`): fires from any app without opening the popup. Cycle: save clipboard → `Opt/Ctrl+Shift+←` selects previous word → copy → look up in DB → paste body over selection → restore original clipboard. Enabled/disabled + hotkey configurable in Settings tab.
+2. **Hotkey-based** (`expander.rs`, default hotkey `Alt+Digit1` — shown as `Alt+1`): fires from any app without opening the popup. Three paths via `text_field::FieldAccess::try_replace_word_before_cursor` → `ReplaceOutcome`:
+   - **`Replaced`** — AX/UIA read the word + replaced it in place; on macOS this is verified by re-reading `AXValue`. No clipboard touch.
+   - **`SelectionActive`** — AX *selected* the abbreviation but the in-place text set was a no-op (Electron / Chromium / Mac-Catalyst: WhatsApp, Slack, Discord, VS Code, …). `expander::paste_over_selection` pastes the body over the live selection (one clipboard write + paste + restore, **no** re-select).
+   - **`Unsupported`** — the focused element exposes no settable text attributes → legacy cycle: save clipboard → `Opt/Ctrl+Shift+←` selects previous word → copy → look up → paste body → restore clipboard.
+   Enabled/disabled + hotkey configurable in Settings tab (with `Alt+1`/`Alt+2`/`Alt+3` quick-pick presets). Pre-0.12 the default was `Alt+Backquote`, unreachable on German ISO Macs — `expander::migrate_legacy_default` bumps an un-customised install to `Alt+Digit1` once (idempotent). **Terminals are unsupported** (no AX-exposed input line, no GUI word-select on a shell prompt) — pressing the hotkey there does nothing; use the popup.
 
-The Settings panel includes a **"Test now"** button that calls `diagnose_at_cursor` — runs the capture half (no paste) and returns what would have been matched, for debugging.
+On macOS, if Accessibility isn't granted the hotkey handler short-circuits *before* the doomed cycle: `expand_at_cursor` returns the `expander::ERR_NO_ACCESSIBILITY` (`"ax.permission_denied"`) sentinel, and `hotkey::register_expander`'s callback pre-checks `accessibility_granted()` → on a miss it shows the popup + emits `"expander-permission-needed"` (frontend turns it into an amber banner). Mirrors the OCR `screen.permission_denied` path.
+
+The Settings panel includes a **"Diagnose"** button that calls `diagnose_at_cursor` — runs the capture half (no paste) and returns what would have been matched (or, on macOS without Accessibility, an explanatory error), for debugging.
 
 ### Screen-region OCR (`region_picker.rs`, `ocr.rs`)
 

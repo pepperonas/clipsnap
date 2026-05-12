@@ -4,6 +4,28 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-05-12
+
+### Fixed — text expander: hotkey now actually fires, failures are no longer silent
+
+- **New default hotkey: `Alt+1`** (the `1`-row digit, not the numpad). The pre-0.12 default `Alt+Backquote` was *unreachable* on German ISO MacBooks — the physical `^`/`°` key under Esc reports as `IntlBackslash` (and on some layouts a different Carbon keycode), so the registered shortcut never matched the key the user pressed and the expander looked dead. Digit-row keys have a fixed `KeyboardEvent.code` on every layout, aren't dead keys anywhere, and aren't reserved by macOS or Windows. A one-time settings migration ([`expander::migrate_legacy_default`](./core/rust-lib/src/expander.rs)) bumps an un-customised `Alt+Backquote` install to `Alt+1`; a migration flag means it won't clobber a value the user deliberately re-picks afterwards. — *#fix(expander)*
+- **Accessibility-missing no longer fails silently.** Previously, if macOS Accessibility wasn't granted, pressing the expander hotkey ran the whole capture/paste cycle — but `enigo`'s synthetic keystrokes silently no-op without the grant, so *nothing happened* and the user had no clue why. Now `expand_at_cursor` returns the `ax.permission_denied` sentinel instead of attempting a doomed clipboard roundtrip on macOS, and the hotkey handler pre-checks `AXIsProcessTrusted()` before dispatching — on a miss it pops the popup, switches to the Settings tab, and emits `expander-permission-needed` so the frontend shows an actionable amber banner ("Force re-grant → Restart now"). Mirrors the existing OCR `screen.permission_denied` pattern. — *#fix(macos)*
+- **`diagnose_at_cursor` reports the real reason** when Accessibility is missing instead of an empty capture ("Accessibility permission isn't granted — … Grant it in the section above, then relaunch.").
+- **Settings → Text expander: one-click presets** `Alt+1` / `Alt+2` / `Alt+3` next to the hotkey-capture button, so the common case doesn't require fighting the recorder widget. The capture widget still accepts any combination; help text now nudges toward digit keys for layout stability. Stored hotkey codes (`Alt+Digit1`) render in the friendly form (`Alt+1`) in tooltips, status text, and the keyboard cheat sheet.
+- **Settle delay** (40 ms) at the start of the expand cycle so a physically-still-held `Alt` (from the hotkey itself) is released before `enigo` synthesizes its own modifier chords — avoids a stuck-modifier state in the source app. Invisible: the popup is hidden the whole time.
+- **Expansion now works in Electron / Chromium / Mac-Catalyst text fields** (WhatsApp Desktop, Slack, Discord, VS Code, …). Those expose `AXValue` read-only: the old code set `AXSelectedTextRange` (which *selects* the abbreviation) then `AXSelectedText` (which returns success but does nothing), so the abbreviation just sat there highlighted, never replaced. The AX replace now **verifies** by re-reading `AXValue`; on a no-op it reports a new `ReplaceOutcome::SelectionActive` and `expander.rs` pastes the snippet body over the live selection (no re-select — `Cmd+Shift+←` would only swallow the previous word). Native Cocoa apps still get the clean in-place `AXSelectedText` replace with no clipboard touch. — *#fix(macos)*
+- **Known limitation, now documented loudly:** the hotkey expander **cannot** work on a terminal command line (Terminal.app, iTerm2, kitty, Alacritty, WezTerm, …). Terminals don't expose the input line via AX, and there's no GUI-style "select previous word" shortcut on a shell prompt — pressing the hotkey there does nothing. Use the popup (`Ctrl+Shift+V` → search the abbreviation → Enter) for terminals.
+- Windows is unaffected-positive: `Alt+1` registers cleanly there, `SendInput` needs no permission, and the UIA Backspace+type / clipboard-fallback paths are unchanged (the new `ReplaceOutcome` enum maps to `Replaced` / `Unsupported` there).
+
+### Changed — bundled AI prompts: no more `[REQUIREMENT]` fill-in slots
+
+- **All 25 `ai*` prompt snippets reworked** ([`core/rust-lib/src/seed/ai_prompts.json`](./core/rust-lib/src/seed/ai_prompts.json)) to drop the `[REQUIREMENT]` / `[CODE]` / `[CHANGE]` / `[SYSTEM]` / `[DOMAIN]` … input placeholders. The prompts are now the **structured-instruction half only** — designed to be appended to (or pasted alongside) your own prompt / code / context, so the subject comes from the surrounding text rather than a fill-in slot. Openers changed accordingly (`"…for: [REQUIREMENT]"` → `"…for the requirement at hand"`; `"the following code"` → `"the code at hand"`); choice-placeholders (`[PostgreSQL / SQLite / …]`, `[vitest / pytest / …]`, downtime budget, …) became `"as specified, or ask / default to X"` instead of literal brackets; the `## …` output structure is unchanged. — *#chore(snippets)*
+- **Seed flag not bumped** (`seed.default_snippets_v1` stays). New installs get the new prompts automatically; existing installs keep their current `ai*` snippets until they click **Restore defaults** in the Snippets sidebar — deliberate, since a forced re-seed would clobber customised prompts and resurrect deleted ones.
+
+### Why 0.12.0
+
+Changes the default hotkey (a user-visible behaviour change with a settings migration), adds a new event surface (`expander-permission-needed`) and new public error sentinel, plus the presets UI. Beyond a 0.11.x patch — minor bump per `docs/RELEASING.md`'s 0.x.0-vs-0.x.y rule.
+
 ## [0.11.0] — 2026-05-10
 
 ### Fixed — OCR no longer fails silently when Screen Recording is denied

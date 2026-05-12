@@ -116,16 +116,13 @@ pub fn run(context: tauri::Context<Wry>) {
             hotkey::register(&app.handle())?;
 
             // Restore the expander hotkey from settings if it was enabled
-            // last time the app ran. Default is disabled — opt-in.
+            // last time the app ran. Default is disabled — opt-in. One-time
+            // migration bumps the pre-0.12 `Alt+Backquote` default (broken
+            // on German ISO Macs) to the layout-stable `Alt+Digit1`.
             {
                 let enabled = settings::get_bool(&db_handle, expander::KEY_ENABLED, false)
                     .unwrap_or(false);
-                let hotkey_str = settings::get_or(
-                    &db_handle,
-                    expander::KEY_HOTKEY,
-                    expander::DEFAULT_HOTKEY,
-                )
-                .unwrap_or_else(|_| expander::DEFAULT_HOTKEY.to_string());
+                let hotkey_str = expander::migrate_legacy_default(&db_handle);
                 let state = app
                     .state::<hotkey::ExpanderShortcutState>();
                 if let Err(e) = hotkey::register_expander(

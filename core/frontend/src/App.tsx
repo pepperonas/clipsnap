@@ -49,6 +49,12 @@ function App() {
   // The popup auto-shows + this flag flips → banner directs the
   // user into Settings → Permissions to fix the underlying TCC state.
   const [ocrPermissionMissing, setOcrPermissionMissing] = useState(false);
+  // Same pattern again, for the text expander: the Rust hotkey handler
+  // fires this when the expander hotkey is pressed but macOS Accessibility
+  // isn't granted — otherwise the whole cycle silently no-ops and the
+  // hotkey looks dead. We pop the popup + switch to Settings + show this
+  // banner so the fix is one click away.
+  const [expanderPermissionMissing, setExpanderPermissionMissing] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Pulled once from tauri.conf.json via the core:app permission set.
@@ -163,6 +169,27 @@ function App() {
     const id = window.setTimeout(() => setOcrPermissionMissing(false), 15000);
     return () => window.clearTimeout(id);
   }, [ocrPermissionMissing]);
+
+  // Backend fires this when the text-expander hotkey is pressed but the
+  // Accessibility grant is missing. Switch to Settings (where the
+  // Accessibility banner + "Force re-grant" button live) and surface a
+  // banner so the failed expansion isn't silent.
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined;
+    (async () => {
+      unlisten = await listen("expander-permission-needed", () => {
+        setExpanderPermissionMissing(true);
+        setActiveTab("settings");
+      });
+    })();
+    return () => unlisten?.();
+  }, []);
+
+  useEffect(() => {
+    if (!expanderPermissionMissing) return;
+    const id = window.setTimeout(() => setExpanderPermissionMissing(false), 15000);
+    return () => window.clearTimeout(id);
+  }, [expanderPermissionMissing]);
 
   const activate = async (i: number, shiftKey = false) => {
     const target = combined[i];
@@ -297,6 +324,24 @@ function App() {
             </span>
             <button
               onClick={() => setOcrPermissionMissing(false)}
+              className="rounded px-1.5 text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {expanderPermissionMissing && (
+          <div className="flex items-start gap-2 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-[12px]">
+            <span className="flex-1">
+              <b>Text expansion failed — macOS Accessibility access not granted.</b>{" "}
+              ClipSnap can&apos;t read the focused field or type the snippet
+              without it. Use <b>Force re-grant</b> in the amber banner below,
+              then click <b>Restart now</b>.
+            </span>
+            <button
+              onClick={() => setExpanderPermissionMissing(false)}
               className="rounded px-1.5 text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
               title="Dismiss"
             >

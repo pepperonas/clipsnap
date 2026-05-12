@@ -23,13 +23,36 @@
 //! mutates focused UI — they're widely supported, well-maintained, and
 //! don't go through synthesised keystrokes at all.
 //!
-//! [`FieldAccess::try_replace_word_before_cursor`] returns `Ok(true)` when
-//! it successfully read & replaced the word in-place, `Ok(false)` when
-//! the focused element didn't expose the necessary AX/UIA attributes
-//! (caller falls back to the keystroke path), and `Err` for actual
+//! [`FieldAccess::try_replace_word_before_cursor`] returns a
+//! [`ReplaceOutcome`]: `Replaced` (done — read & replaced in place,
+//! verified), `SelectionActive` (the accessibility layer *selected* the
+//! abbreviation but couldn't replace the text — common in Electron /
+//! Mac-Catalyst text views that expose `AXValue` read-only; the caller
+//! should paste the body over the live selection), or `Unsupported` (the
+//! focused element doesn't expose the necessary settable attributes — the
+//! caller falls back to keystroke select + paste). `Err` is for actual
 //! failures (permission denied, OS error, …).
 
 use anyhow::Result;
+
+/// What [`FieldAccess::try_replace_word_before_cursor`] managed to do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplaceOutcome {
+    /// Read the word and replaced it in place via the accessibility API,
+    /// and verified the change landed. Nothing more for the caller to do.
+    Replaced,
+    /// The accessibility layer set the *selection* onto the abbreviation
+    /// (so it's visibly highlighted) but the in-place text replacement was
+    /// a no-op — the typical Electron / Chromium / Mac-Catalyst case where
+    /// `AXSelectedText` set returns success but doesn't apply. The caller
+    /// should paste the replacement over the live selection **without
+    /// re-selecting** (the range is already on the abbreviation).
+    SelectionActive,
+    /// The focused element doesn't expose the settable AX/UIA attributes
+    /// at all (couldn't even select). The caller should fall back to the
+    /// keystroke path (`Cmd/Ctrl+Shift+←` to select, then paste).
+    Unsupported,
+}
 
 /// Accessibility-layer access to the focused text field. Implemented per
 /// platform via raw FFI to the native API:
@@ -45,13 +68,9 @@ pub trait FieldAccess {
     fn read_word_before_cursor(&self) -> Result<Option<String>>;
 
     /// Replace the word immediately before the cursor with `replacement`.
-    /// Returns:
-    /// - `Ok(true)` — replaced in-place via the accessibility API. Caller
-    ///   does not need to fall back to keystroke synthesis.
-    /// - `Ok(false)` — the focused element doesn't support setting
-    ///   selected text. Caller should fall back.
-    /// - `Err(_)` — actual error (e.g. AX permission revoked mid-call).
-    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<bool>;
+    /// See [`ReplaceOutcome`] for the three success cases; `Err(_)` is an
+    /// actual error (e.g. AX permission revoked mid-call).
+    fn try_replace_word_before_cursor(&self, replacement: &str) -> Result<ReplaceOutcome>;
 }
 
 /// What `try_inplace_capture_and_replace` actually did. Surfaced via the
@@ -152,8 +171,8 @@ pub mod stub {
         fn read_word_before_cursor(&self) -> Result<Option<String>> {
             Ok(None)
         }
-        fn try_replace_word_before_cursor(&self, _replacement: &str) -> Result<bool> {
-            Ok(false)
+        fn try_replace_word_before_cursor(&self, _replacement: &str) -> Result<ReplaceOutcome> {
+            Ok(ReplaceOutcome::Unsupported)
         }
     }
 }

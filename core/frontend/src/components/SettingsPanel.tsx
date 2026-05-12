@@ -44,7 +44,25 @@ import type { BackupImportResult } from "../lib/types";
 import { formatBytes } from "../lib/format";
 import { HotkeyCapture } from "./HotkeyCapture";
 
-const DEFAULT_HOTKEY = "Alt+Backquote";
+// Must match `expander::DEFAULT_HOTKEY` in the Rust core. `Digit1` is the
+// `1`-row key (not the numpad) — layout-stable everywhere, no dead-key /
+// reserved-combo surprises. Shown to the user as "Alt+1".
+const DEFAULT_HOTKEY = "Alt+Digit1";
+
+// One-click presets so the user doesn't have to fight the capture widget
+// for the common case. `value` is the W3C `KeyboardEvent.code` string the
+// backend stores; `label` is what we render.
+const QUICK_HOTKEYS: ReadonlyArray<{ label: string; value: string }> = [
+  { label: "Alt+1", value: "Alt+Digit1" },
+  { label: "Alt+2", value: "Alt+Digit2" },
+  { label: "Alt+3", value: "Alt+Digit3" },
+];
+
+/** Render a stored hotkey code-string ("Alt+Digit1") in the friendly form
+ *  ("Alt+1") used in tooltips / status text. */
+function prettyHotkey(code: string): string {
+  return code.replace(/\bDigit(\d)\b/g, "$1").replace(/\bKey([A-Z])\b/g, "$1");
+}
 
 interface Props {
   /** Notes-tab refresh — used to reflect imported notes immediately. */
@@ -289,7 +307,7 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
       setStatus({
         kind: "ok",
         message: applied.enabled
-          ? `Expander armed: ${applied.hotkey}`
+          ? `Expander armed: ${prettyHotkey(applied.hotkey)}`
           : "Expander disabled.",
       });
     } catch (e) {
@@ -645,9 +663,9 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
 
           <Row
             label="Hotkey"
-            help="Click the button and press a key combination. Backspace clears, Esc cancels. Names match the W3C KeyboardEvent.code spec (Backquote, KeyE, Digit1, …)."
+            help="Press a key combination, or pick a preset. Backspace clears, Esc cancels. Names match the W3C KeyboardEvent.code spec (Digit1, KeyE, Backquote, …). Tip: digit keys (Alt+1 …) are the most reliable — they're in the same place on every keyboard layout."
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <HotkeyCapture
                 value={hotkey}
                 onChange={setHotkey}
@@ -657,10 +675,30 @@ export function SettingsPanel({ onBackupImported }: Props = {}) {
                 onClick={reset}
                 disabled={busy || hotkey === DEFAULT_HOTKEY}
                 className="rounded border border-[var(--color-border)] px-2 py-1 text-[11px] text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-fg)] disabled:opacity-40"
-                title="Reset to Alt+Backquote"
+                title={`Reset to ${prettyHotkey(DEFAULT_HOTKEY)}`}
               >
                 Reset
               </button>
+              <span className="text-[11px] text-[var(--color-muted)]">presets:</span>
+              {QUICK_HOTKEYS.map((q) => {
+                const active = hotkey === q.value;
+                return (
+                  <button
+                    key={q.value}
+                    onClick={() => setHotkey(q.value)}
+                    disabled={busy}
+                    className={
+                      "rounded border px-2 py-1 text-[11px] disabled:opacity-40 " +
+                      (active
+                        ? "border-[var(--color-accent)] text-[var(--color-accent)]"
+                        : "border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]")
+                    }
+                    title={`Use ${q.label}`}
+                  >
+                    {q.label}
+                  </button>
+                );
+              })}
             </div>
           </Row>
 
@@ -1078,7 +1116,7 @@ function ShortcutsTable() {
       rows: [
         [k("Ctrl", shift, "V"), "Open ClipSnap popup", "OS-locked, not configurable"],
         [k(cmd, shift, "O"), "OCR region capture", IS_MAC ? "Drag a marquee over text on screen → text → clipboard" : "Stub — macOS-only for now"],
-        [k(alt, "`"), "Trigger text expander", "Configurable above; opt-in"],
+        [k(alt, "1"), "Trigger text expander", "Default Alt+1 — configurable above; opt-in"],
       ],
     },
     {

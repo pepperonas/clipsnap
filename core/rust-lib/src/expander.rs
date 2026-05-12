@@ -32,7 +32,7 @@ use std::time::Duration;
 
 use crate::db::DbHandle;
 use crate::snippets;
-use crate::text_field::{default_field_access, native_path, CapturePath};
+use crate::text_field::{default_field_access, native_path, CapturePath, ReplaceOutcome};
 
 /// enigo `Settings` with `open_prompt_to_get_permissions = false` —
 /// see paste.rs for the full rationale. Every `Enigo::new()` here uses
@@ -185,11 +185,55 @@ pub fn force_reset_and_request_grant() -> anyhow::Result<bool> {
 /// Settings keys.
 pub const KEY_HOTKEY: &str = "expander.hotkey";
 pub const KEY_ENABLED: &str = "expander.enabled";
+/// One-shot flag: set once the legacy `Alt+Backquote` default has been
+/// migrated to [`DEFAULT_HOTKEY`]. Prevents re-migrating a value the user
+/// deliberately set back to `Alt+Backquote` afterwards.
+pub const KEY_HOTKEY_MIGRATED: &str = "expander.hotkey_migrated_v0_12";
 
-/// Default hotkey when no setting has ever been written. `Alt + Backquote`
-/// is the German `^` key directly under Esc; on US layouts it lands on the
-/// `` ` / ~ `` key in the same physical position.
-pub const DEFAULT_HOTKEY: &str = "Alt+Backquote";
+/// Default hotkey when no setting has ever been written. `Alt + Digit1`
+/// (the `1` row key, **not** the numpad) is layout-stable on every
+/// keyboard: it has a fixed `KeyboardEvent.code` everywhere, isn't a
+/// dead key on any layout, and isn't reserved by macOS or Windows. The
+/// previous default `Alt+Backquote` was unreachable on German ISO Macs
+/// (the physical `^` key reports as `IntlBackslash`, not `Backquote`).
+pub const DEFAULT_HOTKEY: &str = "Alt+Digit1";
+
+/// The pre-0.12 default, kept only so [`migrate_legacy_default`] can
+/// recognise an un-customised old install and bump it.
+pub const LEGACY_DEFAULT_HOTKEY: &str = "Alt+Backquote";
+
+/// Error string returned by [`expand_at_cursor`] / [`diagnose_at_cursor`]
+/// when synthetic input is needed but the OS hasn't granted it (macOS
+/// Accessibility). The hotkey handler turns this sentinel into a popup +
+/// `expander-permission-needed` event so the user gets an actionable
+/// banner instead of a silent no-op.
+pub const ERR_NO_ACCESSIBILITY: &str = "ax.permission_denied";
+
+/// One-time settings migration: if the stored hotkey is still the pre-0.12
+/// default `Alt+Backquote` (i.e. the user never changed it), rewrite it to
+/// the new layout-stable [`DEFAULT_HOTKEY`]. A migration flag makes this
+/// idempotent and prevents clobbering a value the user re-picks later.
+/// Returns the hotkey string that should be used from here on.
+pub fn migrate_legacy_default(db: &DbHandle) -> String {
+    use crate::settings;
+
+    let stored = settings::get_or(db, KEY_HOTKEY, DEFAULT_HOTKEY)
+        .unwrap_or_else(|_| DEFAULT_HOTKEY.to_string());
+
+    if settings::get_bool(db, KEY_HOTKEY_MIGRATED, false).unwrap_or(false) {
+        return stored;
+    }
+
+    let upgraded = if stored == LEGACY_DEFAULT_HOTKEY {
+        let _ = settings::set(db, KEY_HOTKEY, DEFAULT_HOTKEY);
+        tracing::info!("migrated expander hotkey {LEGACY_DEFAULT_HOTKEY} → {DEFAULT_HOTKEY}");
+        DEFAULT_HOTKEY.to_string()
+    } else {
+        stored
+    };
+    let _ = settings::set(db, KEY_HOTKEY_MIGRATED, "true");
+    upgraded
+}
 
 /// Diagnostic outcome of an expand-cycle attempt: what got captured,
 /// whether it matched a snippet, and a preview of what would be pasted.
@@ -234,6 +278,20 @@ pub fn diagnose_at_cursor(db: &DbHandle) -> Result<DiagnoseResult> {
     // trusted yet.
     let access = default_field_access();
     let access_ok = accessibility_granted();
+
+    // On macOS, without the Accessibility grant we can neither read the
+    // focused field (AX) nor synthesize the clipboard-roundtrip keystrokes
+    // (enigo no-ops) — the diagnosis would just report an empty capture
+    // and leave the user guessing. Surface the real reason instead.
+    #[cfg(target_os = "macos")]
+    if !access_ok {
+        return Err(anyhow!(
+            "Accessibility permission isn't granted — ClipSnap can't read the \
+             focused field or synthesize keystrokes without it. Grant it in the \
+             section above, then relaunch ClipSnap."
+        ));
+    }
+
     let (captured, path) = match if access_ok {
         access.read_word_before_cursor()
     } else {
@@ -289,6 +347,15 @@ pub fn diagnose_at_cursor(db: &DbHandle) -> Result<DiagnoseResult> {
 /// keystroke + clipboard roundtrip only when the focused element doesn't
 /// expose accessibility info.
 pub fn expand_at_cursor(db: &DbHandle) -> Result<()> {
+    // The hotkey itself is `Alt+<key>` — when this runs (queued onto the
+    // main thread, a few ms after key-down) the user may still be
+    // physically holding that `Alt`. Give it a beat to come up before we
+    // synthesize our own modifier chords; otherwise enigo's press/release
+    // can race the user's still-down key and produce a stuck-modifier
+    // state in the source app. Invisible: the popup is hidden the whole
+    // time anyway.
+    thread::sleep(Duration::from_millis(40));
+
     // ── Path 1: native accessibility (AX / UIA) ────────────────────────────
     // Skip AX entirely when the process isn't trusted — calling AX from
     // an untrusted process fires the macOS permission prompt as a side
@@ -300,19 +367,27 @@ pub fn expand_at_cursor(db: &DbHandle) -> Result<()> {
     if accessibility_granted() {
         if let Ok(Some(word)) = access.read_word_before_cursor() {
             if let Some(snippet) = snippets::find_by_exact_abbreviation(db, &word)? {
-                // Try the in-place replace via the same accessibility
-                // layer. Returns false when the focused element exposes
-                // a value/range for *reading* but not for setting —
-                // which is rare on macOS (most AX-aware fields support
-                // both) but normal on Windows (UiaFieldAccess
-                // deliberately uses Backspace+type for the write half
-                // because UIA's Replace is patchily implemented).
+                // Try the in-place replace via the same accessibility layer.
                 match access.try_replace_word_before_cursor(&snippet.body) {
-                    Ok(true) => return Ok(()),
-                    Ok(false) => {
+                    Ok(ReplaceOutcome::Replaced) => return Ok(()),
+                    Ok(ReplaceOutcome::SelectionActive) => {
+                        // The AX layer *selected* the abbreviation but the
+                        // in-place text set was a no-op — the typical
+                        // Electron / Chromium / Mac-Catalyst case (WhatsApp,
+                        // Slack, Discord, VS Code, …): those expose `AXValue`
+                        // read-only and return success for the set anyway.
+                        // The abbreviation is highlighted right now, so just
+                        // paste the body over it — do NOT re-select.
                         tracing::debug!(
-                            "AX/UIA replace not supported for this element; \
-                             falling back to clipboard paste"
+                            "AX selected the abbreviation but in-place replace \
+                             was a no-op; pasting body over the live selection"
+                        );
+                        return paste_over_selection(&snippet.body);
+                    }
+                    Ok(ReplaceOutcome::Unsupported) => {
+                        tracing::debug!(
+                            "focused element exposes no settable text attrs; \
+                             falling back to keystroke-select + paste"
                         );
                         // Reuse the abbreviation we already captured.
                         return expand_via_clipboard(db, Some(&word), Some(&snippet.body));
@@ -331,6 +406,18 @@ pub fn expand_at_cursor(db: &DbHandle) -> Result<()> {
     }
 
     // ── Path 2: clipboard roundtrip (legacy) ───────────────────────────────
+    // This path synthesizes `Cmd/Ctrl+Shift+←` + `Cmd/Ctrl+C` + `Cmd/Ctrl+V`
+    // via enigo. On macOS that needs the Accessibility (AXIsProcessTrusted)
+    // grant — and if we got here on macOS, the `if accessibility_granted()`
+    // above was false, so this would silently no-op. Bail with the
+    // sentinel instead; the caller turns it into a "grant Accessibility"
+    // banner. On Windows/Linux `accessibility_granted()` is always true,
+    // so this never fires and the keystroke path runs normally.
+    #[cfg(target_os = "macos")]
+    if !accessibility_granted() {
+        return Err(anyhow!(ERR_NO_ACCESSIBILITY));
+    }
+
     expand_via_clipboard(db, None, None)
 }
 
@@ -383,15 +470,35 @@ fn expand_via_clipboard(
 
     // 5) Replace selection: write the body, paste over the highlight.
     write_clipboard_text(&body)?;
-    thread::sleep(Duration::from_millis(30));
+    thread::sleep(Duration::from_millis(50));
     send_paste()?;
 
     // 6) Restore the user's original clipboard after the paste has
     //    consumed the snippet body. The delay is generous — too short and
     //    the source app may end up pasting the *restored* clipboard.
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(180));
     restore_clipboard(saved.as_deref());
 
+    Ok(())
+}
+
+/// Paste `body` over whatever is currently selected in the focused app,
+/// then restore the user's clipboard text. Used when the accessibility
+/// layer managed to *select* the abbreviation but couldn't replace the
+/// text in place — the typical Electron / Mac-Catalyst case. No
+/// re-selection here: the selection is already on the abbreviation, so a
+/// `Cmd/Ctrl+Shift+←` would only extend it onto the previous word.
+fn paste_over_selection(body: &str) -> Result<()> {
+    let saved = read_clipboard_text();
+    write_clipboard_text(body)?;
+    // Give the pasteboard write time to propagate before we paste —
+    // Catalyst / Electron apps can be sluggish about observing it.
+    thread::sleep(Duration::from_millis(50));
+    send_paste()?;
+    // Generous restore delay — too short and the source app ends up
+    // pasting the *restored* clipboard instead of the body.
+    thread::sleep(Duration::from_millis(180));
+    restore_clipboard(saved.as_deref());
     Ok(())
 }
 
@@ -503,7 +610,55 @@ mod tests {
         // settings UI, so they're effectively part of our public API.
         assert_eq!(KEY_HOTKEY, "expander.hotkey");
         assert_eq!(KEY_ENABLED, "expander.enabled");
-        assert_eq!(DEFAULT_HOTKEY, "Alt+Backquote");
+        assert_eq!(DEFAULT_HOTKEY, "Alt+Digit1");
+        assert_eq!(LEGACY_DEFAULT_HOTKEY, "Alt+Backquote");
+        // The new default must be a string the shortcut parser accepts.
+        crate::hotkey::parse_shortcut(DEFAULT_HOTKEY).expect("default hotkey must parse");
+    }
+
+    #[test]
+    fn migrate_legacy_default_upgrades_untouched_install() {
+        use crate::settings;
+        use parking_lot::Mutex;
+        use rusqlite::Connection;
+        use std::sync::Arc;
+
+        let db = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        settings::init_table(&db).unwrap();
+
+        // Untouched old install: hotkey row holds the legacy default.
+        settings::set(&db, KEY_HOTKEY, LEGACY_DEFAULT_HOTKEY).unwrap();
+        assert_eq!(migrate_legacy_default(&db), DEFAULT_HOTKEY);
+        assert_eq!(
+            settings::get(&db, KEY_HOTKEY).unwrap().as_deref(),
+            Some(DEFAULT_HOTKEY)
+        );
+        // Idempotent — and won't clobber a value re-picked afterwards.
+        settings::set(&db, KEY_HOTKEY, LEGACY_DEFAULT_HOTKEY).unwrap();
+        assert_eq!(migrate_legacy_default(&db), LEGACY_DEFAULT_HOTKEY);
+    }
+
+    #[test]
+    fn migrate_legacy_default_leaves_custom_hotkey_alone() {
+        use crate::settings;
+        use parking_lot::Mutex;
+        use rusqlite::Connection;
+        use std::sync::Arc;
+
+        let db = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+        settings::init_table(&db).unwrap();
+        settings::set(&db, KEY_HOTKEY, "Ctrl+Shift+E").unwrap();
+        assert_eq!(migrate_legacy_default(&db), "Ctrl+Shift+E");
+        assert_eq!(
+            settings::get(&db, KEY_HOTKEY).unwrap().as_deref(),
+            Some("Ctrl+Shift+E")
+        );
+    }
+
+    #[test]
+    fn error_sentinel_is_stable() {
+        // The hotkey handler matches on this exact string.
+        assert_eq!(ERR_NO_ACCESSIBILITY, "ax.permission_denied");
     }
 
     #[test]

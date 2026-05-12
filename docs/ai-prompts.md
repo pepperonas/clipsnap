@@ -1,8 +1,20 @@
 # Bundled AI prompt snippets
 
-ClipSnap ships with **25 curated AI-prompt templates** that get seeded into your snippet table on first launch. Type the abbreviation in the search field (or use the text expander), press Enter, and the full structured prompt lands in your destination app — ready to hand to an LLM without further massaging.
+ClipSnap ships with **25 curated AI-prompt snippets** that get seeded into your snippet table on first launch. Type the abbreviation in the search field (or use the text expander), press Enter, and the structured instruction lands in your destination app.
 
-Introduced in **v0.5.0**.
+Introduced in **v0.5.0**. Reworked in **v0.12.0** to drop the `[REQUIREMENT]` / `[CODE]` / `[CHANGE]` … fill-in placeholders — see [How they're meant to be used](#how-theyre-meant-to-be-used).
+
+## How they're meant to be used
+
+These snippets are **the instruction half only** — they don't carry a "paste your input here" slot. The requirement / code / change / dataset / domain you want the LLM to act on comes from **whatever you've already written**: paste the snippet *after* (or before) your own prompt, your code, your change description, your chat-thread context. The snippet just adds the structure — *"produce a detailed implementation plan for the requirement at hand, in this exact format: …"* — and the LLM picks up the subject from the surrounding text.
+
+So the workflow is:
+
+1. Write (or already have) your actual prompt / code / context.
+2. Append the relevant `ai*` snippet (search-field Enter, expander hotkey, or Snippets-tab Paste).
+3. Send. The model answers about *your* thing, formatted the way the snippet demands.
+
+If the surrounding context is missing something the snippet needs (target SQL dialect, framework, downtime budget, …), the snippet tells the model to ask rather than guess.
 
 ## Why bundled defaults?
 
@@ -83,7 +95,7 @@ Three ways to put a default prompt to work:
 Open the popup (`Ctrl+Shift+V`), type `aiplan`, press Enter. The full prompt body lands in the previously focused app.
 
 ### 2. Snippet expander hotkey (Settings → Text expander)
-With the expander enabled, type `aiplan` directly in any text field, press your configured hotkey (default `Alt+Backquote` on a German keyboard / `Alt+\`` on US), the abbreviation gets replaced in place with the full prompt.
+With the expander enabled, type `aiplan` directly in any text field — right after your own prompt text — press your configured hotkey (default `Alt+1`), and the abbreviation gets replaced in place with the full structured instruction.
 
 ### 3. Snippets-tab paste button
 Open the popup → **Snippets** tab → click any prompt to select → click **Paste** in the detail pane.
@@ -94,8 +106,9 @@ Open the **Snippets** tab → click any `ai*` prompt → edit Abbreviation / Tit
 
 Common customisations:
 - Translate to your preferred language (we ship English because it's the highest-floor across LLMs)
-- Add `[CONTEXT]` placeholders specific to your codebase / domain
-- Tighten section requirements that don't apply to your work
+- Bake in standing context about your codebase / domain (stack, conventions, the repo's name) so you don't restate it every time
+- Tighten or drop section requirements that don't apply to your work
+- Note: the bundled prompts deliberately have **no fill-in placeholders** — the subject comes from your surrounding text. If you'd rather have an explicit slot, add one yourself (e.g. `--- INPUT ---` at the end), but most users find appending the snippet to existing context cleaner.
 
 If you wreck a prompt and want it back, click **Restore defaults** in the sidebar — it'll upsert all 25 to their bundled versions while leaving your custom snippets alone.
 
@@ -111,6 +124,8 @@ Or batch-import via **Import…** with a JSON file matching the snippet schema (
 ## Versioning
 
 The bundled set is versioned via the `seed.default_snippets_v1` settings flag. If a future release ships an updated prompt library, the flag suffix changes (`_v2`, etc.), forcing a re-seed for everyone. We'll only do that for genuinely substantial improvements — not for minor wording tweaks — because the re-seed will overwrite users' edits to default-keyed prompts.
+
+> **v0.12.0 — placeholder removal.** Despite being a meaningful rework, this one did *not* bump the flag. Reasoning: a re-seed would clobber anyone's customised `ai*` prompts and resurrect deleted ones. New installs get the new placeholder-free prompts automatically; existing installs keep their current `ai*` snippets until you click **Restore defaults** in the Snippets sidebar (which upserts the new versions over the `ai*` keys, leaving your own snippets alone).
 
 If you're maintaining your own version of a default prompt, give it a different abbreviation (`aiplan-mine`, `aiplan-de`) so it survives any future re-seed.
 

@@ -128,15 +128,17 @@ Everything else (snippets management, notes, settings, image tools) lives in the
 - **AES-256-GCM at rest** since v0.6.0 — text/HTML/RTF/image bodies, snippet bodies, note bodies. Key in OS keychain (Keychain / Credential Manager / Secret Service), 0600 keyfile fallback. Full reference: [`docs/encryption.md`](./docs/encryption.md).
 - **Time chip** (v0.10.3) — the relative-time hint on each row (`just now`, `1h ago`) becomes a tiny clickable button: hover shows both `Captured` and `Last used` absolute timestamps in a tooltip; click toggles the chip itself between relative and absolute display.
 
-### Text expander (snippets, v0.2 — system-wide v0.2.7)
+### Text expander (snippets, v0.2 — system-wide v0.2.7, hotkey overhaul v0.12.0)
 - **In-popup expansion** — type an abbreviation in the search bar; matching snippets surface above clipboard entries; Enter pastes the body.
-- **System-wide expansion** — type the abbreviation in *any* text field, press the configured hotkey (default `Alt+Backquote`, opt-in via Settings), ClipSnap replaces it in place. Primary path reads the focused field via OS accessibility (`AXUIElement` / `IUIAutomation`) — no clipboard touch, no keystroke flicker. Falls back to clipboard+keystroke when the field doesn't expose AX/UIA. Diagnose button in Settings reports which path was used.
+- **System-wide expansion** — type the abbreviation in *any* text field, press the configured hotkey (default `Alt+1`, opt-in via Settings; one-click presets `Alt+1` / `Alt+2` / `Alt+3`, or record any combination), ClipSnap replaces it in place. Three paths: AX/UIA in-place replace (native apps — no clipboard touch, no flicker, verified by re-reading the value); AX-select-then-paste-over-selection for Electron / Chromium / Mac-Catalyst apps that expose `AXValue` read-only (WhatsApp, Slack, Discord, VS Code — v0.12.0); and a clipboard+keystroke fallback for everything else. Diagnose button in Settings reports which path was used.
+  - *Why `Alt+1` and not `Alt+Backquote`?* The old default was unreachable on German ISO MacBooks (the physical `^` key reports as `IntlBackslash`). Digit-row keys are layout-stable everywhere. An un-customised old install is migrated to `Alt+1` once on upgrade (won't clobber a value you deliberately re-pick).
+- **Loud on permission failure (macOS, v0.12.0)** — if Accessibility isn't granted, pressing the hotkey no longer silently no-ops: ClipSnap opens its popup, switches to Settings, and shows an amber banner with `Force re-grant` → `Restart now`. (Same pattern as the OCR / paste banners.)
 - **Snippets tab** for create/edit/delete with a two-column form. **JSON import** via Snippets → Import (`docs/snippets-import.md`, themed samples in `docs/examples/snippets/`).
-- Caveat: terminals & legacy GUI toolkits sometimes don't expose AX/UIA cleanly → falls back to keystrokes; image/file snippets aren't expanded (text only).
+- Caveat: **terminal command lines are not supported** (no AX-exposed input line, no GUI "select previous word" on a shell prompt — the hotkey does nothing there; use the popup). Image/file snippets aren't expanded (text only).
 - Full reference: [`docs/text-expander.md`](./docs/text-expander.md).
 
-### 25 bundled AI prompt snippets (v0.5.0)
-First-launch seeds your snippet table with `ai*`-prefixed prompts across programming, web, IT security, business, data, and API design (`aiplan`, `aireview`, `airefactor`, `airegex`, `aisql`, `aitest`, `aimigration`, `aithumb`, `aithreat`, `aipentest`, `aibrief`, `aiml`, `aiapi`, …). Each prompt is a structured brief, ready to hand to an LLM. Idempotent (deleted prompts stay deleted), restorable from the Snippets sidebar. Full list: [`docs/ai-prompts.md`](./docs/ai-prompts.md).
+### 25 bundled AI prompt snippets (v0.5.0, reworked v0.12.0)
+First-launch seeds your snippet table with `ai*`-prefixed prompts across programming, web, IT security, business, data, and API design (`aiplan`, `aireview`, `airefactor`, `airegex`, `aisql`, `aitest`, `aimigration`, `aithumb`, `aithreat`, `aipentest`, `aibrief`, `aiml`, `aiapi`, …). Each prompt is the **structured-instruction half only** — no `[REQUIREMENT]`-style fill-in slots (removed in v0.12.0). You append it to your own prompt / code / context and the LLM picks up the subject from there. Idempotent (deleted prompts stay deleted), restorable from the Snippets sidebar — existing installs click *Restore defaults* to pick up the v0.12.0 style. Full list: [`docs/ai-prompts.md`](./docs/ai-prompts.md).
 
 ### Inline calculator (v0.2.5)
 Type a math expression in the search field, the result appears as the top list item — Alfred-style. Press Enter to paste it.
@@ -333,7 +335,7 @@ Full feature reference: [`docs/notes.md`](./docs/notes.md). Backup file schema a
 
 ```bash
 pnpm test               # frontend unit tests (vitest + happy-dom) — 86 tests
-cargo test --workspace  # Rust unit tests — 107 tests (db, snippets, notes, backup, settings, expander, text_field, seed, hotkey parser, clipboard_watcher, models, recolor, cutout, cutout_ml)
+cargo test --workspace  # Rust unit tests — 110 tests (db, snippets, notes, backup, settings, expander, text_field, seed, hotkey parser, clipboard_watcher, models, recolor, cutout, cutout_ml)
 ```
 
 The same commands run in [GitHub Actions CI](./.github/workflows/ci.yml) on every push and PR.
@@ -352,7 +354,8 @@ pnpm check            # cargo clippy (workspace) + tsc --noEmit + eslint
 | **No sensitive-app detection** | ClipSnap captures everything without filtering. |
 | **No cloud sync** | No automatic sync or multi-device support — but the [Backup](./docs/backup.md) export/import gives you a portable JSON file you can move between machines manually. |
 | **File paste fallback** | Setting file-list clipboard payloads from Rust is not universally supported; ClipSnap falls back to pasting the newline-joined list of paths as text. |
-| **macOS Accessibility** | Paste simulation (`enigo`) and the system-wide text expander require Accessibility access. Grant it once in System Settings → Privacy & Security → Accessibility. If missing, ClipSnap shows an amber banner with an `Open Settings` button on the next paste attempt instead of silently failing or re-firing the system dialog (v0.5.1). |
+| **Expander: terminals unsupported** | The hotkey text expander does nothing on a terminal command line (Terminal.app, iTerm2, kitty, Alacritty, WezTerm, …) — terminals don't expose the input line via accessibility and a shell prompt has no GUI "select previous word". Use the popup (`Ctrl+Shift+V` → search → Enter). Electron / Chromium / Mac-Catalyst apps (WhatsApp, Slack, VS Code, …) *are* supported as of v0.12.0, via an AX-select-then-paste path. |
+| **macOS Accessibility** | Paste simulation (`enigo`) and the system-wide text expander require Accessibility access. Grant it once in System Settings → Privacy & Security → Accessibility. If missing, ClipSnap shows an amber banner with an `Open Settings` button on the next paste attempt — and, since v0.12.0, also when the expander hotkey is pressed — instead of silently failing or re-firing the system dialog (v0.5.1 / v0.12.0). |
 | **macOS Screen Recording** | OCR (`Cmd+Shift+O`) requires Screen Recording access — `screencapture -i` is attributed to ClipSnap and macOS denies it without the grant. Pre-checked via `CGPreflightScreenCaptureAccess`; missing permission opens the popup + shows an amber banner pointing to the right Privacy pane (v0.11.0). |
 | **macOS unsigned build** | Release builds are not notarized. macOS may warn "unidentified developer" — right-click the app and choose **Open** to bypass Gatekeeper on first launch. |
 | **macOS rebuild ⇒ re-grant** | `cdhash` changes on every source-affecting rebuild, which invalidates the previous TCC grants. `scripts/install-macos.sh` skips re-signing when the source hash is unchanged so casual rebuilds survive; real source changes still require re-granting. |
