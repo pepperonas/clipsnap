@@ -200,7 +200,8 @@ ClipSnap needs **two** independent macOS TCC grants — Accessibility (paste) an
 - **About dialog** — Settings → About opens a modal with version, license, year, target audience, and a tabular tech-stack overview.
 
 ### System tray + multi-monitor
-- **Tray menu:** Open · Manage Snippets · Manage Notes · **OCR Region (⌘⇧O / Ctrl+Shift+O)** · Pause Capture · Clear History · Start with Windows / Start at Login · Quit.
+- **Tray menu:** Open · Manage Snippets · Manage Notes · **OCR Region (⌘⇧O / Ctrl+Shift+O)** · Pause Capture · ☑/☐ Start with Windows / Start at Login (checkmark reflects state since v0.14.0) · Clear History · Quit.
+- **Autostart on login** (v0.14.0) — toggle in Settings → Startup, or from the tray menu. macOS writes `~/Library/LaunchAgents/ClipSnap.plist`; Windows uses the run-key registry entry. App launches hidden in the tray so it's ready when the popup hotkey hits.
 - **Multi-monitor placement:** popup opens on the monitor with the cursor, horizontally centered, ~⅓ from the top, clamped to the active monitor's bounds (matters on mixed-DPI setups).
 
 ## Repository layout

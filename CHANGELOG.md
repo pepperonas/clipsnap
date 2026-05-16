@@ -4,6 +4,19 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-05-16
+
+### Added — autostart UI: state-visible tray + Settings toggle
+
+- **Tray menu's "Start at Login" / "Start with Windows" item is now a checkable menu item** that visibly reflects the current state (`☑` / ` `) and probes `~/Library/LaunchAgents/ClipSnap.plist` (macOS) / the run-key (Windows) on every tray build, so the checkmark stays right even if the autostart was enabled/disabled outside the app. Toggling updates the check in place and emits the new `autostart-changed` event so other UI surfaces stay in sync. — *#feat(tray)*
+- **New "Startup" section in Settings** with a clearly-labelled "Start at login" (macOS) / "Start with Windows" toggle that explains where the entry lives — much more discoverable than the tray menu for users who don't routinely browse it. Listens for `autostart-changed` so toggling from the tray reflects immediately. — *#feat(ui)*
+- **Two new IPC commands** `get_autostart_enabled` / `set_autostart_enabled` wrapping `tauri-plugin-autostart`'s `AutoLaunchManager`. Both read back the *now-effective* state from the OS rather than echoing the requested value, so the UI reconciles against actual filesystem / registry state if a toggle partially fails.
+- The `tauri-plugin-autostart` default of `MacosLauncher::LaunchAgent` was already correct — no plugin-config change. Removed two dead-code lines (`let _ = autostart;` in setup; `let _ = MacosLauncher::LaunchAgent;` at the end of `build_tray`).
+
+### Why 0.14.0
+
+Adds a new event surface (`autostart-changed`), two new IPC commands, a new Settings section, and a tray menu item type change (`MenuItem` → `CheckMenuItem`). Compatible additions but a meaningful UX feature — new-feature bump per `docs/RELEASING.md`'s 0.x.0-vs-0.x.y rule.
+
 ## [0.13.0] — 2026-05-13
 
 ### Added — direct hotkey → snippet slots (a paste-only expansion mode that works *everywhere*, including terminals)

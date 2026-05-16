@@ -160,7 +160,7 @@ Both modules share the 16 MP hard cap and the multi-format `image` 0.25 dependen
 - **Word-select modifier** (`expander.rs`): `Key::Alt` (Option) on macOS; `Key::Control` elsewhere.
 - **Accessibility check** (`expander.rs`): `AXIsProcessTrusted()` via direct CoreFoundation FFI on macOS; always `true` on other platforms.
 - **Dock visibility** (`lib.rs`): `set_activation_policy(Accessory)` on macOS.
-- **Autostart tray label** (`lib.rs`): `cfg!(target_os = "windows")` → "Start with Windows", else "Start at Login".
+- **Autostart tray label** (`lib.rs`): `cfg!(target_os = "windows")` → "Start with Windows", else "Start at Login". As of v0.14.0 it's a `CheckMenuItem` reflecting the current state (probed from `app.autolaunch().is_enabled()` on tray build); toggling updates the check + emits `autostart-changed`. IPC: `get_autostart_enabled` / `set_autostart_enabled`. Settings → Startup mirrors the toggle.
 
 ### macOS notes
 

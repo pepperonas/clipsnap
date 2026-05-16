@@ -28,11 +28,11 @@ pub use ui_state::UiState;
 use std::sync::atomic::Ordering;
 
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
+    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Emitter, Manager, Wry, WindowEvent,
 };
-use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::clipboard_watcher::WatcherState;
@@ -158,9 +158,6 @@ pub fn run(context: tauri::Context<Wry>) {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let autostart = app.autolaunch();
-            let _ = autostart;
-
             if let Some(window) = app.get_webview_window(hotkey::POPUP_LABEL) {
                 let app_handle = app.handle().clone();
                 window.on_window_event(move |ev| {
@@ -223,6 +220,8 @@ pub fn run(context: tauri::Context<Wry>) {
             commands::force_reset_and_request_grant,
             commands::quit_app,
             commands::relaunch_app,
+            commands::get_autostart_enabled,
+            commands::set_autostart_enabled,
             commands::pick_screen_color,
             commands::recolor_image_entry,
             commands::image_chromaticity,
@@ -252,8 +251,16 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let pause_item = MenuItemBuilder::with_id("pause", "Pause Capture").build(app)?;
     let clear_item = MenuItemBuilder::with_id("clear", "Clear History…").build(app)?;
     let autostart_label = if cfg!(target_os = "windows") { "Start with Windows" } else { "Start at Login" };
-    let autostart_item =
-        MenuItemBuilder::with_id("autostart", autostart_label).build(app)?;
+    // Probe the current state on tray build so the checkmark reflects
+    // reality at launch — including the case where the plist / registry
+    // entry was created outside the app.
+    let autostart_state = app.autolaunch().is_enabled().unwrap_or(false);
+    let autostart_item = CheckMenuItemBuilder::with_id("autostart", autostart_label)
+        .checked(autostart_state)
+        .build(app)?;
+    // The click handler needs to update the checkmark after toggling, so
+    // keep a clone for the closure. `CheckMenuItem<R>` is a cheap handle.
+    let autostart_item_for_handler = autostart_item.clone();
     let sep = PredefinedMenuItem::separator(app)?;
     let sep_ocr = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
@@ -349,10 +356,18 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             }
             "autostart" => {
                 let am = app.autolaunch();
-                let enabled = am.is_enabled().unwrap_or(false);
-                let res = if enabled { am.disable() } else { am.enable() };
-                if let Err(e) = res {
-                    tracing::warn!("autostart toggle: {e:#}");
+                let was_enabled = am.is_enabled().unwrap_or(false);
+                let res = if was_enabled { am.disable() } else { am.enable() };
+                match res {
+                    Ok(()) => {
+                        // Read back what the OS now reports (rather than
+                        // trusting `!was_enabled` — guards against the
+                        // toggle silently failing without an Err return).
+                        let now = am.is_enabled().unwrap_or(!was_enabled);
+                        let _ = autostart_item_for_handler.set_checked(now);
+                        let _ = app.emit("autostart-changed", now);
+                    }
+                    Err(e) => tracing::warn!("autostart toggle: {e:#}"),
                 }
             }
             "quit" => {
@@ -362,6 +377,5 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    let _ = MacosLauncher::LaunchAgent;
     Ok(())
 }

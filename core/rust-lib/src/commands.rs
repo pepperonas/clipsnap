@@ -606,6 +606,34 @@ pub fn relaunch_app(app: AppHandle) {
     app.exit(0);
 }
 
+// ── Autostart (login item / LaunchAgent) ────────────────────────────────────
+
+/// Whether ClipSnap is set to launch automatically on login. On macOS this
+/// checks for `~/Library/LaunchAgents/ClipSnap.plist`; on Windows it
+/// checks the run-key registry entry. Both go through the
+/// `tauri-plugin-autostart` `AutoLaunchManager`.
+#[tauri::command]
+pub fn get_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Enable or disable autostart. Returns the *now-effective* state (read
+/// back from the OS) so the caller can reconcile its UI with reality
+/// without a separate round-trip. Emits the `autostart-changed` event so
+/// the tray menu and any other listeners (the Settings panel itself
+/// re-renders on the IPC result) stay in sync.
+#[tauri::command]
+pub fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let am = app.autolaunch();
+    let res = if enabled { am.enable() } else { am.disable() };
+    res.map_err(|e| e.to_string())?;
+    let now = am.is_enabled().map_err(|e| e.to_string())?;
+    let _ = app.emit("autostart-changed", now);
+    Ok(now)
+}
+
 /// Show the system-wide screen eyedropper. Returns immediately;
 /// the picked hex (or `null` on cancel) is delivered later via the
 /// Tauri event `"color-picked"`.

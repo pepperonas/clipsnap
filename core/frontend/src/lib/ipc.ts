@@ -321,6 +321,24 @@ export function relaunchApp(): Promise<void> {
   return invoke("relaunch_app");
 }
 
+// ── Autostart (login item / LaunchAgent) ─────────────────────────────────────
+
+/** Whether ClipSnap is set to launch automatically on login.
+ *  macOS: checks `~/Library/LaunchAgents/ClipSnap.plist`.
+ *  Windows: checks the run-key registry entry. */
+export function getAutostartEnabled(): Promise<boolean> {
+  return invoke("get_autostart_enabled");
+}
+
+/** Toggle autostart. Returns the *now-effective* state read back from the
+ *  OS (so the UI can reconcile against actual filesystem / registry state
+ *  if the underlying call partially failed). The backend also emits the
+ *  `autostart-changed` event with the same boolean — listen for it to
+ *  keep tray + Settings in sync when one toggles the other. */
+export function setAutostartEnabled(enabled: boolean): Promise<boolean> {
+  return invoke("set_autostart_enabled", { enabled });
+}
+
 /** Read a backup JSON file from `path` and merge it into the live database. */
 export function importBackup(path: string): Promise<BackupImportResult> {
   return invoke("import_backup", { path });
