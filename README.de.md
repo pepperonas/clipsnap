@@ -259,6 +259,10 @@ Literal Control auf jedem OS. Dieselbe Taste auf Windows und macOS. Der Expander
 | Keyboard-Shortcuts-Cheat-Sheet | Settings → *Keyboard shortcuts* (OS-adaptive Glyphen) | core |
 | About-Dialog | Settings → About | core |
 
+<div align="center">
+  <img src="docs/ir-ff-w1024-optimized.png?v=1" alt="Inspector Rust — Keyboard-first Clipboard-Toolkit" width="600" />
+</div>
+
 ## Features
 
 ### Clipboard-Core

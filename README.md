@@ -259,6 +259,10 @@ Literal Control on every OS. Same key on Windows and macOS. The expander hotkey 
 | Keyboard shortcuts cheat sheet | Settings → *Keyboard shortcuts* (OS-adaptive glyphs) | core |
 | About dialog | Settings → About | core |
 
+<div align="center">
+  <img src="docs/ir-ff-w1024-optimized.png?v=1" alt="Inspector Rust — keyboard-first clipboard toolkit" width="600" />
+</div>
+
 ## Features
 
 ### Clipboard core
