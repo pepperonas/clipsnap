@@ -7,7 +7,7 @@
 <div align="center">
   <img src="docs/inspector-rust.png?v=3" alt="Built with Rust" width="600" />
 
-  # Inspector Rust
+  # Inspector Rust 🕵️‍♂️
 
   **The keyboard-first clipboard hyper-toolkit for people who think `Cmd+V` should be a verb, a noun, and a way of life — Windows 11 & macOS, native, no Electron, no cloud, no bullshit.**
 
