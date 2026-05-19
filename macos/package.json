@@ -1,7 +1,7 @@
 {
   "name": "inspector-rust-macos",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Inspector Rust — macOS bundle shell (Tauri CLI entry + frontend proxy scripts)",
   "scripts": {
     "tauri": "tauri",

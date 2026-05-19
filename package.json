@@ -1,7 +1,7 @@
 {
   "name": "inspector-rust",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Fast, lightweight clipboard history manager + text expander for Windows 11 and macOS. Built on Tauri 2.",
   "license": "MIT",
   "author": "Martin Pfeffer <martinpaush@gmail.com>",

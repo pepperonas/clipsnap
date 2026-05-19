@@ -4,6 +4,16 @@ All notable changes to Inspector Rust are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] — 2026-05-19
+
+### Fixed — backup-export default filename regression from the v0.16.0 rebrand
+
+- **Settings → Backup & restore → Export** proposed `inspector-rust-backup-.json` (no timestamp) instead of `inspector-rust-backup-<iso>.json`. The v0.16.0 brand rename ran a perl substitution that interpreted the JS template-literal `${stamp}` as a Perl variable lookup and silently dropped it. Caught during the v0.16.0 doc audit while sweeping for other rename damage; the file in question (`SettingsPanel.tsx`) is opaque to plain `grep` on this machine, which is why this and a dozen "ClipSnap" mentions slipped through the original rebrand. Now correctly proposes `inspector-rust-backup-2026-05-19T22-30-15.json` etc. — *#fix(backup)*
+
+### Why 0.16.1
+
+A one-line code fix to a user-visible default filename. Pure patch.
+
 ## [0.16.0] — 2026-05-19
 
 ### Changed — full rebrand: ClipSnap → Inspector Rust
