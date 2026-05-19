@@ -1,7 +1,7 @@
 {
   "name": "clipsnap",
   "private": true,
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Fast, lightweight clipboard history manager + text expander for Windows 11 and macOS. Built on Tauri 2.",
   "license": "MIT",
   "author": "Martin Pfeffer <martinpaush@gmail.com>",

@@ -4,6 +4,17 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] — 2026-05-19
+
+### Fixed — OCR history ordering: text on top, image below
+
+- **OCR pipeline persists the source PNG *first*, then the recognised text.** Both rows get a `last_used_at` of `now()` at insert time, so the second insert wins the "most recent" slot. The popup sorts history `last_used_at DESC` — previously the *image* was on top (because text was inserted first), which is confusing because the *text* is the OCR result the user actually wanted: opening the popup post-OCR and pressing Enter pasted the screenshot instead of the recognised string. Now the text entry is on top and matches what's on the system clipboard. — *#fix(ocr)*
+- No behaviour change for the clipboard write itself — `ctx.set_text` still runs once, before either history insert, with `mark_self_write(Text, ...)` so the watcher doesn't double-capture.
+
+### Why 0.14.2
+
+Pure ordering fix in `commands::run_ocr_pipeline`. No API surface change, no version-bump rationale beyond "patch level for a user-visible UX bug".
+
 ## [0.14.1] — 2026-05-19
 
 ### Changed — OCR hotkey is now literal `Ctrl+Shift+O` on every OS

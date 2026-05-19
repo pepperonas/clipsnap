@@ -1034,22 +1034,11 @@ pub fn run_ocr_pipeline(app: &AppHandle) -> Result<OcrResult, String> {
     ctx.set_text(trimmed.to_string())
         .map_err(|e| format!("set_text: {e:?}"))?;
 
-    // Also persist the recognised text into history so the user can
-    // recall it from the popup later (full fuzzy-search reach).
-    if let Some(db) = app.try_state::<DbHandle>() {
-        let _ = db::upsert_clip(
-            &db,
-            &crate::models::NewClip {
-                content_type: crate::models::ContentType::Text,
-                content_text: trimmed.to_string(),
-                content_data: trimmed.to_string(),
-                byte_size: trimmed.len() as i64,
-            },
-        );
-    }
-    // Also keep the source PNG around as an image entry — useful when
-    // the OCR misread something and the user wants the original to
-    // re-OCR a different region or just paste the screenshot.
+    // Persist the source PNG FIRST so the recognised text gets the
+    // later `last_used_at` timestamp and ends up at the top of the
+    // history list. Otherwise the image appears above the text — which
+    // is confusing because the *text* is what the user wanted from OCR,
+    // and pressing Enter on the top entry would paste the image.
     if let Some(db) = app.try_state::<DbHandle>() {
         let b64 = B64.encode(&png_bytes);
         let summary = format!("[ocr source · {} B]", png_bytes.len());
@@ -1061,6 +1050,19 @@ pub fn run_ocr_pipeline(app: &AppHandle) -> Result<OcrResult, String> {
                 content_text: summary,
                 content_data: b64,
                 byte_size,
+            },
+        );
+    }
+    // Then the recognised text — this becomes the most-recent entry,
+    // matching what's on the clipboard and what Enter will paste.
+    if let Some(db) = app.try_state::<DbHandle>() {
+        let _ = db::upsert_clip(
+            &db,
+            &crate::models::NewClip {
+                content_type: crate::models::ContentType::Text,
+                content_text: trimmed.to_string(),
+                content_data: trimmed.to_string(),
+                byte_size: trimmed.len() as i64,
             },
         );
     }
