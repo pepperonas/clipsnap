@@ -131,6 +131,10 @@ Triggered by `Ctrl+Shift+O` — literal Control on every OS (v0.14.1+), not Cmd 
 - **OCR** (macOS) uses Vision via raw `objc2` msg_send: `NSData::dataWithBytes:length:` → `VNImageRequestHandler.alloc().initWithData:options:` → `VNRecognizeTextRequest` (recognitionLevel=0/Accurate, usesLanguageCorrection=true) → `performRequests:error:` synchronously → enumerate `request.results` taking `topCandidates(1).string`. Vision is linked explicitly via `core/rust-lib/build.rs` (`cargo:rustc-link-lib=framework=Vision`).
 - **Output**: text written to system clipboard (with `WatcherState::mark_self_write` so the watcher doesn't recapture it), plus two history entries — **source PNG first, recognised text second** (v0.14.2+), so the text wins the later `last_used_at` and is the most-recent entry at the top of the list (Enter then pastes text, not the screenshot). Returns `OcrResult { text, cancelled, chars }` so the frontend can show "recognised N chars" toasts.
 
+### Screen-region screenshot (`commands::run_screenshot_pipeline`, v0.15.0)
+
+Triggered by `Ctrl+Shift+S` (literal Control on every OS) or the tray's **Screenshot Region** menu. Same `region_picker::capture` + Screen-Recording TCC gate as OCR but **no OCR step** — the captured PNG is written straight to the system clipboard via `ClipboardContext::set_image` and persisted to history as a `[screenshot · N B]` image entry. Works on regions that contain no recognisable text (charts, buttons, photos, UI mockups). `mark_self_write(Image, b64)` arms the watcher to skip the round-trip. IPC: `screenshot_region` returns `ScreenshotResult { cancelled, bytes }`. `register_direct_slots` rejects `Ctrl+Shift+S` alongside the popup/OCR/abbreviation hotkeys.
+
 ### Image tools (`recolor.rs`, `cutout_ml.rs`)
 
 Two image actions surface in the preview pane:

@@ -229,6 +229,7 @@ pub fn run(context: tauri::Context<Wry>) {
             commands::cut_out_image_file,
             commands::save_image_entry_to_downloads,
             commands::ocr_region,
+            commands::screenshot_region,
             commands::get_screen_recording_status,
             commands::request_screen_recording_grant,
             commands::open_screen_recording_settings,
@@ -242,12 +243,20 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let open_item = MenuItemBuilder::with_id("open", "Open (Ctrl+Shift+V)").build(app)?;
     let snippets_item = MenuItemBuilder::with_id("snippets", "Manage Snippets").build(app)?;
     let notes_item = MenuItemBuilder::with_id("notes", "Manage Notes").build(app)?;
+    // Both global shortcuts use literal Control on every OS since
+    // v0.14.1 — the macOS glyph for Control is ⌃ (not ⌘).
     let ocr_label = if cfg!(target_os = "macos") {
-        "OCR Region (⌘⇧O)"
+        "OCR Region (⌃⇧O)"
     } else {
         "OCR Region (Ctrl+Shift+O)"
     };
     let ocr_item = MenuItemBuilder::with_id("ocr", ocr_label).build(app)?;
+    let screenshot_label = if cfg!(target_os = "macos") {
+        "Screenshot Region (⌃⇧S)"
+    } else {
+        "Screenshot Region (Ctrl+Shift+S)"
+    };
+    let screenshot_item = MenuItemBuilder::with_id("screenshot", screenshot_label).build(app)?;
     let pause_item = MenuItemBuilder::with_id("pause", "Pause Capture").build(app)?;
     let clear_item = MenuItemBuilder::with_id("clear", "Clear History…").build(app)?;
     let autostart_label = if cfg!(target_os = "windows") { "Start with Windows" } else { "Start at Login" };
@@ -273,6 +282,7 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             &notes_item,
             &sep_ocr,
             &ocr_item,
+            &screenshot_item,
             &sep,
             &pause_item,
             &autostart_item,
@@ -317,6 +327,18 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                         }
                         Ok(_) => tracing::debug!("OCR (tray): cancelled or empty"),
                         Err(e) => tracing::warn!("OCR (tray) failed: {e}"),
+                    }
+                });
+            }
+            "screenshot" => {
+                let app2 = app.clone();
+                std::thread::spawn(move || {
+                    match commands::run_screenshot_pipeline(&app2) {
+                        Ok(r) if !r.cancelled && r.bytes > 0 => {
+                            tracing::info!("screenshot (tray): {} bytes", r.bytes);
+                        }
+                        Ok(_) => tracing::debug!("screenshot (tray): cancelled or empty"),
+                        Err(e) => tracing::warn!("screenshot (tray) failed: {e}"),
                     }
                 });
             }

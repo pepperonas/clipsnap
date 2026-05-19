@@ -95,6 +95,7 @@ The honest, *permanent* fix to this re-grant churn is an Apple Developer ID (~$9
 |---------------------------------------|----------------------------|
 | Open popup                            | `Ctrl` + `Shift` + `V`     |
 | Screen-region OCR (drag a marquee)    | `Ctrl` + `Shift` + `O`     |
+| Screen-region screenshot (no OCR)     | `Ctrl` + `Shift` + `S`     |
 | Expand snippet abbreviation in place  | `Alt` + `1` (default, configurable) |
 | Direct-slot hotkeys (paste snippet)   | configurable in Settings — work even in terminals |
 | Navigate list                         | `↑` / `↓`                  |
@@ -109,6 +110,7 @@ ClipSnap runs as a **menu-bar background app** — there is no Dock icon. The ac
 - **Manage Snippets** — open the popup directly on the Snippets tab
 - **Manage Notes** — open the popup directly on the Notes tab
 - **OCR Region (⌃⇧O)** — drag a marquee → recognised text on the clipboard (literal Control, not Cmd — v0.14.1+)
+- **Screenshot Region (⌃⇧S)** — drag a marquee → PNG on the clipboard + history, no OCR step (v0.15.0+)
 - **Pause Capture** — stop recording new clipboard items
 - **☑ Start at Login** — toggle macOS LaunchAgent registration (`~/Library/LaunchAgents/ClipSnap.plist`); checkmark reflects current state (v0.14.0)
 - **Clear History…** — wipe all stored entries

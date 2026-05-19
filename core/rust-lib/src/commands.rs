@@ -1083,6 +1083,92 @@ pub fn ocr_region(app: AppHandle) -> Result<OcrResult, String> {
     run_ocr_pipeline(&app)
 }
 
+/// Result of a screenshot region capture. `cancelled` distinguishes
+/// "user pressed Esc" from "captured N bytes" — the UI skips the
+/// "saved to clipboard" toast in the cancel case.
+#[derive(serde::Serialize)]
+pub struct ScreenshotResult {
+    pub cancelled: bool,
+    /// PNG payload size in bytes — for a frontend "Captured 12.3 KB"
+    /// toast without re-measuring on the JS side.
+    pub bytes: usize,
+}
+
+/// Run the screenshot pipeline: hide popup → interactive region
+/// capture → write PNG to clipboard → add to history. Same plumbing
+/// as `run_ocr_pipeline` but with no OCR step — so regions that
+/// contain *no* text (a button, a chart, a photo) still produce a
+/// usable history entry and clipboard payload.
+///
+/// Shared between the IPC command (tray "Screenshot Region", future
+/// button) and the global shortcut handler. Blocks for the duration
+/// of the screencapture (user-driven) — always invoke from a worker
+/// thread.
+pub fn run_screenshot_pipeline(app: &AppHandle) -> Result<ScreenshotResult, String> {
+    use base64::{engine::general_purpose::STANDARD as B64, Engine};
+    use clipboard_rs::{common::RustImage, Clipboard, ClipboardContext, RustImageData};
+
+    if !screen_recording::screen_recording_granted() {
+        return Err(ERR_NO_SCREEN_RECORDING.to_string());
+    }
+
+    hotkey::hide_popup(app);
+
+    let png_bytes = match region_picker::capture() {
+        Ok(b) => b,
+        Err(e) => {
+            if e.downcast_ref::<region_picker::Cancelled>().is_some() {
+                return Ok(ScreenshotResult { cancelled: true, bytes: 0 });
+            }
+            return Err(format!("region capture failed: {e:#}"));
+        }
+    };
+
+    let b64 = B64.encode(&png_bytes);
+    let summary = format!("[screenshot · {} B]", png_bytes.len());
+    let byte_size = png_bytes.len() as i64;
+
+    // Mark the upcoming clipboard write as self-originated so the
+    // watcher doesn't recapture it as a fresh user copy.
+    if let Some(watcher) = app.try_state::<WatcherState>() {
+        watcher.mark_self_write(crate::models::ContentType::Image, &b64);
+    }
+
+    // Write the PNG to the system clipboard so the user can Cmd+V it
+    // straight into the next app without going through the popup.
+    let ctx = ClipboardContext::new()
+        .map_err(|e| format!("clipboard ctx init: {e:?}"))?;
+    let img = RustImageData::from_bytes(&png_bytes)
+        .map_err(|e| format!("decode png: {e:?}"))?;
+    ctx.set_image(img)
+        .map_err(|e| format!("set_image: {e:?}"))?;
+
+    // Persist to history — even after the user Cmd+V's into a chat
+    // and the clipboard gets overwritten by their next copy, the
+    // screenshot is still recoverable from the History tab.
+    if let Some(db) = app.try_state::<DbHandle>() {
+        let _ = db::upsert_clip(
+            &db,
+            &crate::models::NewClip {
+                content_type: crate::models::ContentType::Image,
+                content_text: summary,
+                content_data: b64,
+                byte_size,
+            },
+        );
+    }
+    let _ = app.emit("clipboard-changed", ());
+
+    Ok(ScreenshotResult { cancelled: false, bytes: png_bytes.len() })
+}
+
+/// IPC entry point. Same threading note as `ocr_region` — the Tauri
+/// IPC layer already provides a worker thread.
+#[tauri::command]
+pub fn screenshot_region(app: AppHandle) -> Result<ScreenshotResult, String> {
+    run_screenshot_pipeline(&app)
+}
+
 /// Background-remove an image entry via corner-sampled chroma-key, save
 /// the resulting transparent PNG to `~/Downloads/clipsnap-cutout-<ts>.png`,
 /// and return the path string. The history entry is left untouched —

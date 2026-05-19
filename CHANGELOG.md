@@ -4,6 +4,25 @@ All notable changes to ClipSnap are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-05-19
+
+### Added — dedicated screenshot region capture (no OCR required)
+
+- **New `Ctrl+Shift+S` global shortcut** (literal Control on every OS, same convention as `Ctrl+Shift+O` / `Ctrl+Shift+V`): drag a marquee over any region → PNG lands on the system clipboard *and* in History. Same `screencapture -i` UX as `Cmd+Shift+4`, same Screen Recording (TCC ScreenCapture) gate as OCR, but **no OCR step** — works on regions that contain no recognisable text (a chart, a button, a UI mockup, a photo). The OCR shortcut still works as before; the screenshot shortcut is a strict superset of "what OCR couldn't preserve". — *#feat(screenshot)*
+- **Tray menu entry** "Screenshot Region (⌃⇧S)" next to "OCR Region (⌃⇧S)". Same threading model — dispatched to a worker thread because `screencapture -i` blocks until the user finishes the marquee.
+- **Footer hint** shows `⌃⇧S Shot` next to `⌃⇧O OCR` so the shortcut is discoverable every time the popup opens.
+- **Settings → Keyboard shortcuts** cheat sheet gains a row for the screenshot shortcut alongside the OCR one.
+- **Backend** (`core/rust-lib/src/commands.rs`): new `ScreenshotResult { cancelled, bytes }` type, `run_screenshot_pipeline(app)` function (parallel to `run_ocr_pipeline`), and `screenshot_region` IPC command. Shares `region_picker::capture` with OCR. Image is written to clipboard via `ClipboardContext::set_image` and persisted to history as a `[screenshot · N B]` entry. `mark_self_write(Image, b64)` arms the watcher so the round-trip doesn't double-record.
+- **Hotkey registration** (`hotkey.rs`): added third global shortcut. `register_direct_slots` collision check now rejects `Ctrl+Shift+S` alongside the popup/OCR/expander hotkeys.
+
+### Fixed — tray label for OCR shortcut
+
+- macOS tray label said `OCR Region (⌘⇧O)` since the v0.14.1 hotkey change — the Cmd glyph should have been Control (`⌃⇧O`). Caught during the screenshot work; fixed in the same release.
+
+### Why 0.15.0
+
+New global shortcut + new IPC command + new event-emitting tray path = feature-level addition per `docs/RELEASING.md`'s 0.x.0-vs-0.x.y rule. Backwards-compatible — no existing functionality changed.
+
 ## [0.14.2] — 2026-05-19
 
 ### Fixed — OCR history ordering: text on top, image below

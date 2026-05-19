@@ -10,11 +10,12 @@ interface Props {
 
 export function Footer({ index, total, version }: Props) {
   const label = total === 0 ? "0/0" : `${index + 1}/${total}`;
-  // OCR is the most-hidden global shortcut — it fires from anywhere on
-  // the system without needing the popup open. Surfaced in the footer
-  // so users discover it without having to dig into the tray menu or
-  // Settings → Keyboard shortcuts.
+  // OCR + Screenshot are the most-hidden global shortcuts — they fire
+  // from anywhere on the system without needing the popup open.
+  // Surfaced in the footer so users discover them without having to dig
+  // into the tray menu or Settings → Keyboard shortcuts.
   const ocrKey = IS_MAC ? "⌃⇧O" : "Ctrl+⇧+O";
+  const screenshotKey = IS_MAC ? "⌃⇧S" : "Ctrl+⇧+S";
   return (
     <div className="flex h-8 items-center justify-between border-t border-[var(--color-border)] px-4 text-[11px] text-[var(--color-muted)]">
       <div className="flex items-center gap-3">
@@ -22,6 +23,7 @@ export function Footer({ index, total, version }: Props) {
         <Hint k="↑↓" label="Navigate" />
         <Hint k="Esc" label="Close" />
         <Hint k={ocrKey} label="OCR" />
+        <Hint k={screenshotKey} label="Shot" />
       </div>
       <div className="flex items-center gap-3">
         <span title="Made with love by Martin Pfeffer">

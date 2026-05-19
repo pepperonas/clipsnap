@@ -1,16 +1,32 @@
 <div align="center">
-  <img src="docs/clipsnap.png" alt="ClipSnap" width="900" />
-  <br />
-  <img src="docs/rust.png?v=2" alt="Built with Rust" width="200" />
+  <img src="docs/inspector-rust.png?v=1" alt="Built with Rust" width="200" />
 
   # ClipSnap
 
-  **The keyboard-first clipboard toolkit for power users — Windows 11 & macOS**
+  **The keyboard-first clipboard hyper-toolkit for people who think `Cmd+V` should be a verb, a noun, and a way of life — Windows 11 & macOS, native, no Electron, no cloud, no nonsense.**
 
-  Searchable history, system-wide snippets, inline calculator, color picker, image recolor + background removal, screen-region OCR — all behind one hotkey, all local, AES-256 encrypted at rest.
+  This is the clipboard manager that ate its own scope statement.
+
+  Press **`Ctrl+Shift+V`** anywhere on your system → a transparent, frameless popup ghosts into existence over the monitor your cursor lives on, auto-focuses a search bar, fuzzy-searches **1 000 deduped clipboard entries** by content (text, RTF, HTML preview, PNG bitmaps base64'd into SQLite, file path lists), **AES-256-GCM-encrypted at rest** with the key tucked into your **OS keychain** (macOS Keychain / Windows Credential Manager / Linux Secret Service, with a 0600 keyfile fallback for the paranoid). Hit **Enter** — it writes the entry back to the clipboard, hides itself, waits for focus to settle, synthesizes **`Cmd/Ctrl+V`** into whichever app you were just in. The whole loop is under 200 ms cold and under 50 MB RAM resident.
+
+  But that's just the *first* tab. There are four.
+
+  The **search bar doubles as an inline calculator** (`2+2`, `sqrt(144)`, `sin(pi/2)`, hex literals, bit shifts — anything `mathjs` can parse), **a colour converter** (paste `#0078d4` or `rgb(0,120,212)` and get every other format with one click), **a snippet matcher** (type `aiplan` → the *aiplan* AI-prompt body floats to the top of the list, Enter pastes it), and **a Color Picker** button that fires `NSColorSampler` on macOS or a GDI screen-overlay on Windows for system-wide eyedropping. **Image entries** get a preview pane with **Recolor** (9-swatch logo tint via per-pixel luminance lerp), **Cut out background** (a 4.5 MB U²-Net ONNX model statically linked into the binary via the `ort` crate — real photo segmentation, not chroma key, comparable to Python's `rembg` but without Python), and **Save to Downloads** (`⌘S` writes the PNG to disk, perfect for the freshly recoloured logo you just produced).
+
+  **`Ctrl+Shift+O`** fires the **screen-region OCR**: drag a marquee (`screencapture -i` — the same overlay as `Cmd+Shift+4`), and Apple's **Vision** framework runs `VNRecognizeTextRequest` over the selection at `recognitionLevel = Accurate` with language correction. The recognised text lands on your clipboard, in your history (at the top — *fixed in v0.14.2*), and the source PNG is preserved one slot below so you can re-OCR a different region without rescreenshotting. Latin, CJK, Arabic, Cyrillic — whatever your macOS Vision install supports. **`Ctrl+Shift+S`** (new in **v0.15.0**) does the same marquee but **skips the OCR step** — pure region screenshot, PNG straight to clipboard + history, so charts, buttons, photos, and silent UI mockups land where you need them too. Same TCC gate, same threading model, zero text-required.
+
+  The **text expander** has *three* expansion modes living side by side. The **search-based** one (always on, zero permissions): type `mfg` in the popup → matching snippets bubble to the top → Enter pastes. The **abbreviation hotkey** (default `Alt+1`, opt-in via Settings, configurable to anything): type the abbreviation in *any* text field, press the hotkey, ClipSnap replaces it in place via macOS Accessibility API or Windows UIA (with an AX-select-then-paste fallback for Electron / Chromium / Mac-Catalyst apps that don't expose writable text — WhatsApp, Slack, Discord, VS Code — and a clipboard+keystroke last resort for everything else; the *Diagnose* button in Settings reports which path was used). And the **direct hotkey → snippet slots** (added v0.13.0): bind a hotkey straight to a snippet — `Alt+2` → the *aiplan* body — and pressing it pastes the body with **no abbreviation typed**. Reads nothing, so it works **in any app including terminals** (iTerm2, Terminal.app, kitty, Alacritty), where the abbreviation expander can't see the input line.
+
+  Ships with **25 bundled AI prompt snippets** prefixed `ai*` across programming, web, IT security, business, data, and API design (`aiplan`, `aireview`, `airefactor`, `airegex`, `aisql`, `aitest`, `aimigration`, `aithumb`, `aithreat`, `aipentest`, `aibrief`, `aiml`, `aiapi`, `aiux`, `aimarketing`, …), each a structured-instruction half you append to your own prompt or code. Idempotent seeding (deleted prompts stay deleted), one-click *Restore defaults*, and live-editable from the **Snippets tab**. The **Notes tab** turns any clipboard entry into a permanent, categorised bookmark with no history cap. The **Backup tab** exports the full database (history + snippets + notes) into a versioned JSON file you can re-import on another machine; per-section tickboxes let you share snippets-only with a colleague without leaking your history. **Backup is plaintext JSON by design** so it's portable across machines — re-encryption happens at the destination's keychain on import.
+
+  All of it runs as a **menu-bar / tray-resident background process** (no dock icon on macOS via `Accessory` activation policy, no taskbar icon on Windows via `skipTaskbar`). **`Autostart on login`** (added v0.14.0) is a tray-visible check menu item + Settings toggle — macOS writes `~/Library/LaunchAgents/ClipSnap.plist`, Windows uses the run-key registry entry. The popup is **per-monitor aware** (it opens on the monitor your cursor is on, not always the primary), **focus-loss-cancellable** (click outside or Esc to dismiss, with a `suppress_hide` flag during native file dialogs so they don't bounce the popup), and **fuzzy-search-as-you-type** via `fuse.js` with a virtualised list (`@tanstack/react-virtual`) that stays snappy at 1 000 entries.
+
+  **Zero telemetry. Zero network calls. Zero account.** Your data lives at `~/Library/Application Support/ClipSnap/history.db` (macOS) or `%APPDATA%\ClipSnap\history.db` (Windows) and nowhere else. The 4.5 MB ONNX model is *bundled* — even cutouts run offline. The Vision OCR is *local* — Apple's on-device ML, no API key, no rate limit. The encryption keys never leave your machine, the snippets sync nowhere, the history is yours.
+
+  Built with **Tauri 2** (WebView2 / WKWebView), **Rust** (workspace: `core/rust-lib` is the single shared library, `win/src-tauri` + `macos/src-tauri` are two-line bundle shells), **React 19** + **TypeScript 5** + **Tailwind v4** + **Vite 7**, packaged into a **~5 MB MSI** (Windows) or **~5 MB DMG** (macOS Apple Silicon). **110 Rust unit tests + 86 frontend vitest tests** keep it honest. **MIT-licensed**, hackable, and unapologetically built for the kind of person who already has muscle memory for three different clipboard managers and is tired of every one of them.
 
   <!-- ── Status / release ─────────────────────────────────────── -->
-  [![Version](https://img.shields.io/badge/version-0.14.2-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
+  [![Version](https://img.shields.io/badge/version-0.15.0-blue?style=flat-square)](https://github.com/pepperonas/clipsnap/releases)
   [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
   [![CI](https://img.shields.io/github/actions/workflow/status/pepperonas/clipsnap/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/pepperonas/clipsnap/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/actions/workflow/status/pepperonas/clipsnap/release.yml?branch=main&style=flat-square&label=release)](https://github.com/pepperonas/clipsnap/actions/workflows/release.yml)
@@ -51,7 +67,7 @@
   <!-- ── Quality ─────────────────────────────────────────────── -->
   [![ESLint](https://img.shields.io/badge/ESLint-flat%20config-4B32C3?style=flat-square&logo=eslint&logoColor=white)](https://eslint.org)
   [![Vitest](https://img.shields.io/badge/Vitest-3-6E9F18?style=flat-square&logo=vitest&logoColor=white)](https://vitest.dev)
-  [![cargo test](https://img.shields.io/badge/cargo%20test-107%20passing-success?style=flat-square&logo=rust&logoColor=white)](#)
+  [![cargo test](https://img.shields.io/badge/cargo%20test-110%20passing-success?style=flat-square&logo=rust&logoColor=white)](#)
   [![vitest](https://img.shields.io/badge/vitest-86%20passing-success?style=flat-square&logo=vitest&logoColor=white)](#)
   [![cargo clippy](https://img.shields.io/badge/cargo%20clippy-D%20warnings-success?style=flat-square&logo=rust&logoColor=white)](#)
   [![tsc strict](https://img.shields.io/badge/tsc-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](#)
@@ -73,6 +89,59 @@
   [![Languages](https://img.shields.io/github/languages/count/pepperonas/clipsnap?style=flat-square)](https://github.com/pepperonas/clipsnap)
   [![Lines](https://img.shields.io/tokei/lines/github/pepperonas/clipsnap?style=flat-square&label=lines%20of%20code)](https://github.com/pepperonas/clipsnap)
   [![Made with love](https://img.shields.io/badge/made%20with-%E2%99%A5-red?style=flat-square)](#)
+
+  <!-- ── Architecture & build ────────────────────────────────── -->
+  [![Monorepo](https://img.shields.io/badge/repo-pnpm%20workspace-F69220?style=flat-square&logo=pnpm&logoColor=white)](./pnpm-workspace.yaml)
+  [![Workspace crates](https://img.shields.io/badge/cargo%20workspace-3%20crates-CE422B?style=flat-square&logo=rust&logoColor=white)](./Cargo.toml)
+  [![Single binary](https://img.shields.io/badge/distribution-single%20binary-blue?style=flat-square)](#)
+  [![Native](https://img.shields.io/badge/no-Electron-success?style=flat-square)](#)
+  [![Memory](https://img.shields.io/badge/memory-%3C50%20MB-blue?style=flat-square)](#)
+  [![Cold start](https://img.shields.io/badge/cold%20start-%3C200%20ms-blue?style=flat-square)](#)
+  [![MSI size](https://img.shields.io/badge/MSI-~5%20MB-blue?style=flat-square&logo=windows&logoColor=white)](#)
+  [![DMG size](https://img.shields.io/badge/DMG-~5%20MB-blue?style=flat-square&logo=apple&logoColor=white)](#)
+  [![exe size](https://img.shields.io/badge/.exe-~14%20MB-blue?style=flat-square&logo=windows&logoColor=white)](#)
+
+  <!-- ── Features (numerical) ────────────────────────────────── -->
+  [![IPC commands](https://img.shields.io/badge/IPC%20commands-58-blueviolet?style=flat-square)](./core/rust-lib/src/commands.rs)
+  [![Tauri events](https://img.shields.io/badge/events-10-blueviolet?style=flat-square)](#)
+  [![Rust modules](https://img.shields.io/badge/Rust%20modules-22-CE422B?style=flat-square&logo=rust&logoColor=white)](./core/rust-lib/src)
+  [![Snippets](https://img.shields.io/badge/AI%20prompts-25%20bundled-blueviolet?style=flat-square)](./docs/ai-prompts.md)
+  [![Tabs](https://img.shields.io/badge/popup%20tabs-4-blueviolet?style=flat-square)](#)
+  [![DB tables](https://img.shields.io/badge/SQLite%20tables-4-003B57?style=flat-square&logo=sqlite&logoColor=white)](./docs/encryption.md)
+  [![Global shortcuts](https://img.shields.io/badge/global%20hotkeys-3-blueviolet?style=flat-square)](#)
+  [![Snippet expansion modes](https://img.shields.io/badge/expansion%20modes-3-blueviolet?style=flat-square)](./docs/text-expander.md)
+  [![Image formats](https://img.shields.io/badge/image%20formats-5-blueviolet?style=flat-square)](#)
+
+  <!-- ── Standards / conventions ─────────────────────────────── -->
+  [![SemVer](https://img.shields.io/badge/semver-2.0-blue?style=flat-square)](https://semver.org)
+  [![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange?style=flat-square)](https://keepachangelog.com)
+  [![Conventional Commits](https://img.shields.io/badge/commits-conventional-orange?style=flat-square)](https://www.conventionalcommits.org)
+  [![ARIA](https://img.shields.io/badge/a11y-keyboard%20first-blueviolet?style=flat-square)](#)
+  [![ADRs in CHANGELOG](https://img.shields.io/badge/ADRs-in%20CHANGELOG-orange?style=flat-square)](./CHANGELOG.md)
+
+  <!-- ── Permissions / OS surfaces ───────────────────────────── -->
+  [![macOS TCC: Accessibility](https://img.shields.io/badge/macOS%20TCC-Accessibility-000000?style=flat-square&logo=apple&logoColor=white)](./docs/text-expander.md)
+  [![macOS TCC: Screen Recording](https://img.shields.io/badge/macOS%20TCC-Screen%20Recording-000000?style=flat-square&logo=apple&logoColor=white)](#)
+  [![Autostart](https://img.shields.io/badge/autostart-LaunchAgent%20%2F%20RegRun-blue?style=flat-square)](./CHANGELOG.md)
+  [![Tray icon](https://img.shields.io/badge/UI-tray%20resident-blue?style=flat-square)](#)
+
+  <!-- ── Tech (extended) ─────────────────────────────────────── -->
+  [![rusqlite](https://img.shields.io/badge/rusqlite-bundled-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/rusqlite)
+  [![enigo](https://img.shields.io/badge/enigo-paste%20sim-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/enigo)
+  [![clipboard-rs](https://img.shields.io/badge/clipboard--rs-event%20driven-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/clipboard-rs)
+  [![ort](https://img.shields.io/badge/ort-ONNX%20Runtime-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/ort)
+  [![ring](https://img.shields.io/badge/ring-AES--256--GCM-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/ring)
+  [![objc2](https://img.shields.io/badge/objc2-Vision%20FFI-CE422B?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/objc2)
+  [![Fuse.js](https://img.shields.io/badge/fuse.js-fuzzy%20search-005571?style=flat-square)](https://www.fusejs.io)
+  [![lucide-react](https://img.shields.io/badge/icons-lucide--react-F56565?style=flat-square)](https://lucide.dev)
+  [![react-virtual](https://img.shields.io/badge/list-react--virtual-FF4154?style=flat-square&logo=react&logoColor=white)](https://tanstack.com/virtual)
+
+  <!-- ── Vibes ───────────────────────────────────────────────── -->
+  [![Inspired by Alfred](https://img.shields.io/badge/inspired%20by-Alfred-blueviolet?style=flat-square)](#)
+  [![Mouse-free](https://img.shields.io/badge/mouse-not%20required-brightgreen?style=flat-square)](#)
+  [![Self-hosted](https://img.shields.io/badge/data-on%20your%20disk-brightgreen?style=flat-square)](#)
+  [![Free forever](https://img.shields.io/badge/free-forever-brightgreen?style=flat-square)](./LICENSE)
+  [![Made in Germany](https://img.shields.io/badge/made%20in-Germany-FFCE00?style=flat-square)](#)
 
   Press `Ctrl+Shift+V` → search → paste. Inspired by Alfred's clipboard viewer on macOS, scoped to one tool you can keep on every machine.
 </div>

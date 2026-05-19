@@ -123,6 +123,43 @@ pub fn register(app: &AppHandle) -> Result<()> {
         })
         .context("failed to register OCR hotkey")?;
 
+    // Screenshot region — Ctrl+Shift+S on every platform. Same TCC gate
+    // as OCR (Screen Recording permission), same threading concern
+    // (screencapture blocks until the user finishes the marquee).
+    // Unlike OCR this writes the captured PNG straight to the
+    // clipboard, so regions with *no* text (a chart, a button, a
+    // photo) still produce a usable payload.
+    let screenshot = Shortcut::new(
+        Some(Modifiers::CONTROL | Modifiers::SHIFT),
+        Code::KeyS,
+    );
+    let app_for_screenshot = app.clone();
+    app.global_shortcut()
+        .on_shortcut(screenshot, move |_app, sc, event| {
+            if event.state == ShortcutState::Pressed && *sc == screenshot {
+                let app = app_for_screenshot.clone();
+                std::thread::spawn(move || {
+                    match crate::commands::run_screenshot_pipeline(&app) {
+                        Ok(r) if !r.cancelled && r.bytes > 0 => {
+                            tracing::info!("screenshot captured {} bytes", r.bytes);
+                        }
+                        Ok(_) => tracing::debug!("screenshot cancelled or empty"),
+                        Err(e) => {
+                            tracing::warn!("screenshot pipeline: {e}");
+                            // Same permission-denied handling as OCR —
+                            // surface a banner instead of failing silently.
+                            if e == "screen.permission_denied" {
+                                let _ = show_popup(&app);
+                                use tauri::Emitter;
+                                let _ = app.emit("ocr-permission-needed", ());
+                            }
+                        }
+                    }
+                });
+            }
+        })
+        .context("failed to register screenshot hotkey")?;
+
     Ok(())
 }
 
@@ -237,15 +274,16 @@ pub fn register_direct_slots(
     // 2) Parse + validate against the reserved shortcuts and each other.
     let popup = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
     let ocr = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyO);
+    let screenshot = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyS);
     let abbr_hotkey: Option<Shortcut> = *state.current.lock();
 
     let mut parsed: Vec<(Shortcut, i64)> = Vec::with_capacity(slots.len());
     for slot in slots {
         let sc = parse_shortcut(&slot.hotkey)
             .with_context(|| format!("invalid direct-slot hotkey {:?}", slot.hotkey))?;
-        if sc == popup || sc == ocr || abbr_hotkey == Some(sc) {
+        if sc == popup || sc == ocr || sc == screenshot || abbr_hotkey == Some(sc) {
             return Err(anyhow!(
-                "hotkey {} is reserved (popup / OCR / text-expander) — pick another",
+                "hotkey {} is reserved (popup / OCR / screenshot / text-expander) — pick another",
                 slot.hotkey
             ));
         }

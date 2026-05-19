@@ -416,6 +416,28 @@ export function ocrRegion(): Promise<OcrResult> {
   return invoke("ocr_region");
 }
 
+/** Result of a screenshot region capture. `cancelled` separates user
+ *  pressed-Esc from "captured N bytes". `bytes` is the PNG payload size
+ *  so a "saved 12.3 KB" toast can be rendered without re-measuring. */
+export interface ScreenshotResult {
+  cancelled: boolean;
+  bytes: number;
+}
+
+/** Trigger the screenshot pipeline: hide popup → interactive region
+ *  pick (macOS `screencapture -i`) → write PNG to system clipboard →
+ *  also push as a History entry. No OCR step, so regions with no text
+ *  (a button, a chart, a photo) still produce a usable payload.
+ *  macOS only for now; Windows returns an error string. Blocks while
+ *  the user is dragging the marquee.
+ *
+ *  Possible error sentinels (raw strings, switch on these):
+ *    - "screen.permission_denied" — Screen Recording not granted
+ *    - other — wrapped error message from the backend  */
+export function screenshotRegion(): Promise<ScreenshotResult> {
+  return invoke("screenshot_region");
+}
+
 // ── macOS Screen Recording permission ──────────────────────────────────────
 
 /** Whether ClipSnap currently has Screen Recording (TCC ScreenCapture)
